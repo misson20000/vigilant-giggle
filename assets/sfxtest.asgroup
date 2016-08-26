@@ -1,0 +1,27 @@
+[
+  {
+    "type": "sound",
+    "id": "sfxtest.krab",
+    "src": "/sfxtest/KRAB.ogg"
+  },
+  {
+    "type": "sound",
+    "id": "sfxtest.krabs",
+    "src": "/sfxtest/KRABS.ogg"
+  },
+  {
+    "type": "sound",
+    "id": "sfxtest.mr",
+    "src": "/sfxtest/MR.ogg"
+  },
+  {
+    "type": "sound",
+    "id": "sfxtest.oh",
+    "src": "/sfxtest/OH.ogg"
+  },
+  {
+    "type": "sound",
+    "id": "sfxtest.yeah",
+    "src": "/sfxtest/YEAH.ogg"
+  }
+]

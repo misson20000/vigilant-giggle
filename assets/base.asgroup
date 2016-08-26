@@ -1,0 +1,161 @@
+[
+  {
+    "type": "shader",
+    "shadertype": "program",
+    "id": "base.shader.flat.color",
+    "shaders": [
+      "base.shader.frag.flat.color",
+      "base.shader.vert.flat.color"
+    ],
+    "attributes": [
+      {
+        "name": "vertPos",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 3
+      },
+      {
+        "name": "color",
+        "type": "per-shape",
+        "datatype": "color",
+        "components": 3
+      }
+    ],
+    "uniforms": [
+      {
+        "name": "matrix",
+        "datatype": "mat4"
+      }
+    ]
+  },
+  {
+    "type": "shader",
+    "shadertype": "fragment",
+    "id": "base.shader.frag.flat.color",
+    "src": "/base/shader/flat/color.f.glsl"
+  },
+  {
+    "type": "shader",
+    "shadertype": "vertex",
+    "id": "base.shader.vert.flat.color",
+    "src": "/base/shader/flat/color.v.glsl"
+  },
+  {
+    "type": "shader",
+    "shadertype": "program",
+    "id": "base.shader.flat.textured",
+    "shaders": [
+      "base.shader.frag.flat.textured",
+      "base.shader.vert.flat.textured"
+    ],
+    "attributes": [
+      {
+        "name": "vertPos",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 3
+      },
+      {
+        "name": "texCoord",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 2
+      }
+    ],
+    "uniforms": [
+      {
+        "name": "matrix",
+        "datatype": "mat4"
+      },
+      {
+        "name": "tex",
+        "datatype": "tex2d"
+      }
+    ]
+  },
+  {
+    "type": "shader",
+    "shadertype": "fragment",
+    "id": "base.shader.frag.flat.textured",
+    "src": "/base/shader/flat/textured.f.glsl"
+  },
+  {
+    "type": "shader",
+    "shadertype": "vertex",
+    "id": "base.shader.vert.flat.textured",
+    "src": "/base/shader/flat/textured.v.glsl"
+  },
+  {
+    "type": "shader",
+    "shadertype": "program",
+    "id": "base.shader.flat.texcolor",
+    "shaders": [
+      "base.shader.frag.flat.texcolor",
+      "base.shader.vert.flat.texcolor"
+    ],
+    "attributes": [
+      {
+        "name": "vertPos",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 3
+      },
+      {
+        "name": "texCoord",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 2
+      },
+      {
+        "name": "color",
+        "type": "per-shape",
+        "datatype": "color",
+        "components": 3
+      }
+    ],
+    "uniforms": [
+      {
+        "name": "matrix",
+        "datatype": "mat4"
+      },
+      {
+        "name": "tex",
+        "datatype": "tex2d"
+      }
+    ]
+  },
+  {
+    "type": "shader",
+    "shadertype": "fragment",
+    "id": "base.shader.frag.flat.texcolor",
+    "src": "/base/shader/flat/texcolor.f.glsl"
+  },
+  {
+    "type": "shader",
+    "shadertype": "vertex",
+    "id": "base.shader.vert.flat.texcolor",
+    "src": "/base/shader/flat/texcolor.v.glsl"
+  },
+  {
+    "type": "texture",
+    "id": "base.font.coders_crux.texture",
+    "src": "/base/font/coder's_crux_regular_12.png"
+  },
+  {
+    "type": "texture",
+    "id": "base.font.open_sans.texture",
+    "src": "/base/font/open_sans_regular_24.png"
+  },
+  {
+    "type": "font",
+    "id": "base.font.coders_crux",
+    "texture": "base.font.coders_crux.texture",
+    "xml": "/base/font/coder's_crux_regular_12.xml"
+  },
+  {
+    "type": "font",
+    "id": "base.font.open_sans",
+    "texture": "base.font.open_sans.texture",
+    "xml": "/base/font/open_sans_regular_24.xml"
+  }
+]

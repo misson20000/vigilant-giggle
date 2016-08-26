@@ -1,0 +1,3 @@
+AssetManager is told to load an asset group
+It downloads the group descriptor from the asset server
+The group descriptor lists a bunch of assets
