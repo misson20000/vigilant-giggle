@@ -64,12 +64,15 @@ export let SoundEngine = (game) => {
     },
     playMusic(asset) {
       let tracks = {};
+      let sources = [];
       for(let track in asset) {
         let gain = ctx.createGain();
         for(let i = 0; i < asset[track].length; i++) {
           let src = ctx.createMediaElementSource(asset[track][i]);
           src.connect(gain);
+          asset[track][i].currentTime = 0;
           asset[track][i].play();
+          sources.push(asset[track][i]);
         }
         gain.gain.value = 1;
         gain.connect(ctx.destination);
@@ -81,6 +84,11 @@ export let SoundEngine = (game) => {
         },
         setTrackVolume(name, gain) {
           tracks[name].gain.value = gain;
+        },
+        stop() {
+          for(let i = 0; i < sources.length; i++) {
+            sources[i].pause();
+          }
         }
       };
       return music;

@@ -173,14 +173,14 @@ export let AssetManager = {
 AssetManager.addFileProvider({ // download over the network
   priority: -1000,
   getFile(name) {
-    return fetch("/assets/" + name.replace(" ", "%20")).then((response) => {
+    return fetch("assets/" + name.replace(" ", "%20")).then((response) => {
       if(!response.ok) {
-        throw "HTTP " + response.status + " " + response.statusText + " while downloading /assets/" + name.replace(" ", "%20");
+        throw "HTTP " + response.status + " " + response.statusText + " while downloading assets/" + name.replace(" ", "%20");
       }
       return response.blob();
     });
   },
   getURL(file) {
-    return "/assets/" + file;
+    return "assets/" + file;
   }
 });

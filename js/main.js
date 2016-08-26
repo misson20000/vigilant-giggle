@@ -7,28 +7,36 @@ let game = {};
 window.theGame = game;
 
 window.onload = () => {
-  let canvas = document.getElementById("gamecanvas");
-  game.render = WebGLRenderer(game, canvas, canvas.getContext("webgl", {
-    alpha: false,
-    stencil: true
-  }));
-  game.sound = SoundEngine(game);
-  game.mouse = {x: 0, y: 0};
-  
-  game.switchState = (newstate) => {
-    if(game.state && game.state.destroy) {
-      game.state.destroy();
-    }
-    game.state = newstate;
-    if(newstate.initialize) {
-      newstate.initialize();
-    }
-  };
-  
-  game.switchState(PreloaderState(game));
-
-  AssetManager.addAssetLoader(game.render.createAssetLoader());
-  AssetManager.addAssetLoader(game.sound.createAssetLoader());
+  try {
+    let canvas = document.getElementById("gamecanvas");
+    game.render = WebGLRenderer(game, canvas, canvas.getContext("webgl", {
+      alpha: false,
+      stencil: true
+    }) || canvas.getContext("experimental-webgl", {
+      alpha: false,
+      stencil: true      
+    }));
+    game.sound = SoundEngine(game);
+    game.mouse = {x: 0, y: 0};
+    
+    game.switchState = (newstate) => {
+      if(game.state && game.state.destroy) {
+        game.state.destroy();
+      }
+      game.state = newstate;
+      if(newstate.initialize) {
+        newstate.initialize();
+      }
+    };
+    
+    game.switchState(PreloaderState(game));
+    
+    AssetManager.addAssetLoader(game.render.createAssetLoader());
+    AssetManager.addAssetLoader(game.sound.createAssetLoader());
+  } catch(err) {
+    document.write(err);
+    return;
+  }
   
   let lastTick = performance.now();
   game.tick = (timestamp) => {

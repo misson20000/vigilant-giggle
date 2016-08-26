@@ -1,0 +1,18 @@
+[
+  {
+    "type": "music",
+    "id": "mustest.music",
+    "tracks": {
+      "harmony": ["/mustest/2_Harmony.ogg"],
+      "bass": ["/mustest/4_Bass.ogg"],
+      "ride": ["/mustest/10_SparseRide.ogg"],
+      "beat": ["/mustest/12_beat.ogg",
+               "/mustest/13_beat.ogg",
+               "/mustest/14_beat.ogg",
+               "/mustest/15_beat.ogg"],
+      "melody": ["/mustest/1_Melody.ogg"],
+      "arpeggio": ["/mustest/3_Arpeggio.ogg"]
+    },
+    "loops": true
+  }
+]

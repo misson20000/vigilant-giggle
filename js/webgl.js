@@ -4,6 +4,21 @@ import {AssetManager} from "./assetmgr.js";
 import {Mat4, MatrixTransformer} from "./math.js";
 
 export let WebGLRenderer = (game, canvas, gl) => {
+  if(!gl) {
+    if(!canvas.getContext("webgl")) {
+      throw "Could not open any WebGL context";
+    }
+    if(!canvas.getContext("webgl", {alpha: false})) {
+      throw "Could not open WebGL context {alpha: false}";
+    }
+    if(!canvas.getContext("webgl", {stencil: true})) {
+      throw "Could not open WebGL context with stencil";
+    }
+    if(!canvas.getContext("webgl", {alpha: false, stencil: true})) {
+      throw "Could not open WebGL context with no alpha and with stencil";
+    }
+    throw "Could not open WebGL context";
+  }
   gl.enable(gl.BLEND);
   gl.disable(gl.STENCIL_TEST);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -12,6 +27,7 @@ export let WebGLRenderer = (game, canvas, gl) => {
   gl.stencilMask(0);
   
   let workingMatrix = Mat4.create();
+  let currentFb = null;
   
   let render = {
     manageSize() {
@@ -30,10 +46,10 @@ export let WebGLRenderer = (game, canvas, gl) => {
     initMatrices() {
       render.pixelMatrix.load.identity();
       render.pixelCenteredMatrix.load.identity();
-      workingMatrix.load.scale(2/render.width(), -2/render.height(), 1); // scale down to pixels and flip
+      workingMatrix.load.scale(2/render.fbwidth(), -2/render.fbheight(), 1); // scale down to pixels and flip
       render.pixelMatrix.multiply(workingMatrix);
       render.pixelCenteredMatrix.multiply(workingMatrix);
-      workingMatrix.load.translate(-render.width()/2, -render.height()/2, 0);
+      workingMatrix.load.translate(-render.fbwidth()/2, -render.fbheight()/2, 0);
       render.pixelMatrix.multiply(workingMatrix);
     },
 
@@ -69,7 +85,149 @@ export let WebGLRenderer = (game, canvas, gl) => {
         gl.disable(gl.STENCIL_TEST);
       }
     },
-    
+
+    // padding is extra space beyond the edges of the canvas that is guarenteed to be there
+    // margin space is not guarenteed to be there; it serves only to make resizing smoother
+    //  margin defaults to 50 pixels
+    createFramebuffer(padding, margin) {
+      if(margin === undefined) {
+        margin = 50;
+      }
+      
+      let fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+
+      let width = render.width() + 2*padding + 2*margin;
+      let height = render.height() + 2*padding + 2*margin;
+      
+      let tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      let depthrb = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depthrb);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthrb);
+      // Unfortunately, no stencilling in framebuffers cause we can't have the depth and stencil
+      // buffers be seperate renderbufferes and there's no way to have them both in the same
+      // renderbuffer until WebGL2.
+//      let stencilrb = gl.createRenderbuffer();
+//      gl.bindRenderbuffer(gl.RENDERBUFFER, stencilrb);
+//      gl.renderbufferStorage(gl.RENDERBUFFER, gl.STENCIL_INDEX8, width, height);
+//      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.STENCIL_ATTACHMENT, gl.RENDERBUFFER, stencilrb);
+
+      switch(gl.checkFramebufferStatus(gl.FRAMEBUFFER)) {
+      case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+        throw "FRAMEBUFFER_INCOMPLETE_ATTACHMENT";
+      case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+        throw "FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT";
+      case gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+        throw "FRAMEBUFFER_INCOMPLETE_DIMENSIONS";
+      case gl.FRAMEBUFFER_UNSUPPORTED:
+        throw "FRAMEBUFFER_UNSUPPORTED";
+      case gl.FRAMEBUFFER_COMPLETE:
+        break;
+      default:
+        throw "WTF?"
+      }
+      
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+      let texObj = {
+        glTex: tex,
+        width: width,
+        height: height
+      };
+
+      let attributes = [];
+
+      let pixmat = Mat4.create();
+      let pixcentmat = Mat4.create();
+
+      let self = {
+        bind() {
+          if(render.width() + 2*padding > width
+             || render.height() + 2*padding > height) {
+            width = render.width() + 2*padding + 2*margin;
+            height = render.height() + 2*padding + 2*margin;
+            texObj.width = width;
+            texObj.height = height;
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, depthrb);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+          }
+
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+          currentFb = texObj;
+
+          pixmat.load.from(render.pixelMatrix);
+          pixcentmat.load.from(render.pixelCenteredMatrix);
+          render.initMatrices();
+
+          workingMatrix.load.translate((width-render.width())/2,
+                                       (height-render.height())/2, 0);
+          render.pixelMatrix.multiply(workingMatrix);
+          render.pixelCenteredMatrix.multiply(workingMatrix);
+          gl.viewport(0, 0, width, height);
+        },
+        unbind() {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          currentFb = null;
+          render.pixelMatrix.load.from(pixmat);
+          render.pixelCenteredMatrix.load.from(pixcentmat);
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        },
+        getTexture() {
+          return texObj;
+        },
+        getAttributes() {
+          let i = 0;
+          let x = (width-render.width())/(2*width);
+          let y = (height-render.height())/(2*height);
+          attributes[i++] = 0;
+          attributes[i++] = 0;
+          attributes[i++] = 0;
+          attributes[i++] = x;
+          attributes[i++] = 1-y;
+
+          attributes[i++] = render.width();
+          attributes[i++] = 0;
+          attributes[i++] = 0;
+          attributes[i++] = 1-x;
+          attributes[i++] = 1-y;
+          
+          attributes[i++] = 0;
+          attributes[i++] = render.height();
+          attributes[i++] = 0;
+          attributes[i++] = x;
+          attributes[i++] = y;
+          
+          attributes[i++] = render.width();
+          attributes[i++] = render.height();
+          attributes[i++] = 0;
+          attributes[i++] = 1-x;
+          attributes[i++] = y;
+          return attributes;
+        },
+
+        xtoc(x) {
+          return (2*x + width-render.width())/(2*width);
+        },
+        ytoc(y) {
+          return 1.0-(2*y + height-render.height())/(2*height);
+        }
+      };
+      return self;
+    },
+
     width() {
       return canvas.width;
     },
@@ -77,15 +235,26 @@ export let WebGLRenderer = (game, canvas, gl) => {
       return canvas.height;
     },
 
+    fbwidth() { // including padding and margin
+      return currentFb === null ? canvas.width : currentFb.width;
+    },
+    fbheight() { // including padding and margin
+      return currentFb === null ? canvas.height : currentFb.height;
+    },
+
     createAssetLoader() {
       let loaders = {
         "font": (placeholder) => {
           return AssetManager.getFile(placeholder.spec.xml).then((blob) => {
-            return new Promise((resolve, reject) => {
+/*            return new Promise((resolve, reject) => {
               let xhr = new XMLHttpRequest();
               
               xhr.onload = () => {
-                resolve(xhr.responseXML);
+                if(xhr.status != 200) {
+                  throw xhr.statusText;
+                } else {
+                  resolve(xhr.responseXML);
+                }
               };
 
               xhr.onerror = reject;
@@ -94,6 +263,9 @@ export let WebGLRenderer = (game, canvas, gl) => {
               
               xhr.open("GET", URL.createObjectURL(blob));
               xhr.send();
+              });*/
+            return BlobUtil.blobToBinaryString(blob).then((str) => {
+              return new DOMParser().parseFromString(str, "application/xml");
             });
           }).then((doc) => {
             let root = doc.firstChild;
@@ -503,18 +675,27 @@ export let WebGLRenderer = (game, canvas, gl) => {
                                    attrib.runtime.offset);
           }
 
+          let texunit = 0;
           for(let i = 0; i < shader.uniforms.length; i++) {
             let uniform = shader.uniforms[i];
 
+            let value = uniforms[uniform.name]
+            if(shader.uniforms[i].callback) {
+              value = value();
+            }
+            
             switch(shader.uniforms[i].datatype) {
             case "mat4":
-              gl.uniformMatrix4fv(uniform.location, false, uniforms[uniform.name].toGL());
+              gl.uniformMatrix4fv(uniform.location, false, value.toGL());
               break;
             case "tex2d":
-              gl.activeTexture(gl.TEXTURE0);
-              gl.bindTexture(gl.TEXTURE_2D, uniforms[uniform.name].glTex);
-              gl.uniform1i(uniform.location, 0);
+              gl.activeTexture(gl.TEXTURE0 + texunit);
+              gl.bindTexture(gl.TEXTURE_2D, value.glTex);
+              gl.uniform1i(uniform.location, texunit);
+              texunit++;
               break;
+            case "float":
+              gl.uniform1f(uniform.location, value);
             }
           }
           

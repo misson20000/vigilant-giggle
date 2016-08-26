@@ -1,5 +1,7 @@
 varying lowp vec2 vTexCoord;
 
+uniform sampler2D tex;
+
 void main(void) {
-  gl_FragColor = vec4(vTexCoord, 1.0, 1.0);
+  gl_FragColor = vec4(texture2D(tex, vTexCoord));
 }

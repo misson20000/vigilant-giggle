@@ -1,0 +1,66 @@
+[
+  {
+    "type": "shader",
+    "shadertype": "program",
+    "id": "posttest.shader",
+    "shaders": [
+      "posttest.shader.frag",
+      "base.shader.vert.flat.textured"
+    ],
+    "attributes": [
+      {
+        "name": "vertPos",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 3
+      },
+      {
+        "name": "texCoord",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 2
+      }
+    ],
+    "uniforms": [
+      {
+        "name": "matrix",
+        "datatype": "mat4"
+      },
+      {
+        "name": "framebuffer",
+        "datatype": "tex2d"
+      },
+      {
+        "name": "time",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "pixwidth",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "pixheight",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "rippleX",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "rippleY",
+        "datatype": "float",
+        "callback": true
+      }
+    ]
+  },
+  {
+    "type": "shader",
+    "shadertype": "fragment",
+    "id": "posttest.shader.frag",
+    "src": "/posttest/shader.f.glsl"
+  }
+]

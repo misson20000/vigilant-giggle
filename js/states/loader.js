@@ -33,7 +33,9 @@ export let LoaderState = (game) => {
   return {
     initialize() {
       Promise.all([AssetManager.downloadAssetGroup("sfxtest"),
-                   AssetManager.downloadAssetGroup("mustest")])
+                   AssetManager.downloadAssetGroup("mustest"),
+                   AssetManager.downloadAssetGroup("posttest"),
+                   AssetManager.downloadAssetGroup("posttest2")])
         .then(() => {
         transition.to(MenuState(game, transition), 500, 100);
       }, (err) => {

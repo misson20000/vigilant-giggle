@@ -7,7 +7,9 @@ import {KeyboardTestState} from "./test/keyboard.js";
 import {SoundTestState} from "./test/sound.js";
 import {MusicTestState} from "./test/music.js";
 import {StencilTestState} from "./test/stencil.js";
-//import {AboutState} from "./about.js";
+import {PostProcessingTestState} from "./test/post.js";
+import {PostProcessingTest2State} from "./test/post2.js";
+import {AboutState} from "./about.js";
 
 export let MenuState = (game, transition) => {
   let render = game.render;
@@ -43,7 +45,7 @@ export let MenuState = (game, transition) => {
       tests = [
         {
           name: "Me & My Tools",
-//          state: AboutState(game, transition),
+          state: AboutState(game, self, transition),
           anim: 0
         },
         {
@@ -64,6 +66,16 @@ export let MenuState = (game, transition) => {
         {
           name: "Stencil Test",
           state: StencilTestState(game, self, transition),
+          anim: 0
+        },
+        {
+          name: "Post-Processing Test",
+          state: PostProcessingTestState(game, self, transition),
+          anim: 0
+        },
+        {
+          name: "Post-Processing Test 2",
+          state: PostProcessingTest2State(game, self, transition),
           anim: 0
         }
       ];
