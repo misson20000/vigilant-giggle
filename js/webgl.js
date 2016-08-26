@@ -5,8 +5,12 @@ import {Mat4, MatrixTransformer} from "./math.js";
 
 export let WebGLRenderer = (game, canvas, gl) => {
   gl.enable(gl.BLEND);
+  gl.disable(gl.STENCIL_TEST);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-
+  gl.stencilFunc(gl.ALWAYS, 0, 0xFF); // fill stencil buffer with ones
+  gl.stencilOp(gl.REPLACE, gl.REPLACE, gl.REPLACE);
+  gl.stencilMask(0);
+  
   let workingMatrix = Mat4.create();
   
   let render = {
@@ -32,12 +36,40 @@ export let WebGLRenderer = (game, canvas, gl) => {
       workingMatrix.load.translate(-render.width()/2, -render.height()/2, 0);
       render.pixelMatrix.multiply(workingMatrix);
     },
+
+    clearBuffers() {
+      gl.clearColor(0, 0, 0, 1);
+      gl.clearStencil(0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    },
     
     clear(color) {
       gl.clearColor(color.r, color.g, color.b, color.a);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     },
 
+    drawStencil() {
+      gl.stencilMask(0xFF);
+      gl.stencilFunc(gl.ALWAYS, 1, 0xFF); // write ones to stencil buffer
+      gl.stencilOp(gl.REPLACE, gl.REPLACE, gl.REPLACE);
+      gl.colorMask(0, 0, 0, 0);
+    },
+
+    drawColor() {
+      gl.stencilMask(0x00); // disable writing to stencil buffer
+      gl.stencilFunc(gl.EQUAL, 1, 0xFF);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.colorMask(1, 1, 1, 1);
+    },
+
+    setStencil(enabled) {
+      if(enabled) {
+        gl.enable(gl.STENCIL_TEST);
+      } else {
+        gl.disable(gl.STENCIL_TEST);
+      }
+    },
+    
     width() {
       return canvas.width;
     },
@@ -186,6 +218,7 @@ export let WebGLRenderer = (game, canvas, gl) => {
                     attrib.runtime.components[0] = arg.r;
                     attrib.runtime.components[1] = arg.g;
                     attrib.runtime.components[2] = arg.b;
+                    attrib.runtime.components[3] = 1;
                     break;
                   case "vec":
                     for(let j = 0; j < attrib.components; j++) {

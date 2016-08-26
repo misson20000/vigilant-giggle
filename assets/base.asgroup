@@ -18,7 +18,7 @@
         "name": "color",
         "type": "per-shape",
         "datatype": "color",
-        "components": 3
+        "components": 4
       }
     ],
     "uniforms": [
@@ -110,7 +110,7 @@
         "name": "color",
         "type": "per-shape",
         "datatype": "color",
-        "components": 3
+        "components": 4
       }
     ],
     "uniforms": [

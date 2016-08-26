@@ -19,3 +19,12 @@ export let Colors = {
   GREEN: Color(0, 1, 0, 1),
   BLUE: Color(0, 0, 1, 1)
 };
+
+export let ColorUtils = {
+  multRGB(color, fac) {
+    color.r*= fac;
+    color.g*= fac;
+    color.b*= fac;
+    return color;
+  }
+};

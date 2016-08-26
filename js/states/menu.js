@@ -6,6 +6,7 @@ import {Keyboard} from "../keyboard.js";
 import {KeyboardTestState} from "./test/keyboard.js";
 import {SoundTestState} from "./test/sound.js";
 import {MusicTestState} from "./test/music.js";
+import {StencilTestState} from "./test/stencil.js";
 //import {AboutState} from "./about.js";
 
 export let MenuState = (game, transition) => {
@@ -58,6 +59,11 @@ export let MenuState = (game, transition) => {
         {
           name: "Music Test",
           state: MusicTestState(game, self, transition),
+          anim: 0
+        },
+        {
+          name: "Stencil Test",
+          state: StencilTestState(game, self, transition),
           anim: 0
         }
       ];

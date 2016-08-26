@@ -9,7 +9,8 @@ window.theGame = game;
 window.onload = () => {
   let canvas = document.getElementById("gamecanvas");
   game.render = WebGLRenderer(game, canvas, canvas.getContext("webgl", {
-    alpha: false
+    alpha: false,
+    stencil: true
   }));
   game.sound = SoundEngine(game);
   game.mouse = {x: 0, y: 0};
@@ -36,6 +37,7 @@ window.onload = () => {
 
     game.render.manageSize();
     game.render.initMatrices();
+    game.render.clearBuffers();
     
     if(game.state && game.state.tick) {
       game.state.tick(delta);
