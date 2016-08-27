@@ -66,5 +66,55 @@
     "type": "texture",
     "id": "game.noise.perlin",
     "src": "/game/noise/perlin.png"
+  },
+    {
+    "type": "shader",
+    "shadertype": "program",
+    "id": "game.shader.hologram",
+    "shaders": [
+      "game.shader.hologram.fragment",
+      "base.shader.vert.flat.color"
+    ],
+    "attributes": [
+      {
+        "name": "vertPos",
+        "type": "per-vertex",
+        "datatype": "vec",
+        "components": 3
+      },
+      {
+        "name": "color",
+        "type": "per-shape",
+        "datatype": "color",
+        "components": 4
+      }
+    ],
+    "uniforms": [
+      {
+        "name": "matrix",
+        "datatype": "mat4"
+      },
+      {
+        "name": "time",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "pixwidth",
+        "datatype": "float",
+        "callback": true
+      },
+      {
+        "name": "pixheight",
+        "datatype": "float",
+        "callback": true
+      }
+    ]
+  },
+  {
+    "type": "shader",
+    "shadertype": "fragment",
+    "id": "game.shader.hologram.fragment",
+    "src": "/game/shader/hologram.f.glsl"
   }
 ]

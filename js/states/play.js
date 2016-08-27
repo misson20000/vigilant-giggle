@@ -17,6 +17,7 @@ let colors = {
   houseRoof: Color("#5E3F1B"),
   boatStake: Color("#D99445"),
   rope: Color("#F5C998"),
+  dock: Color("#806E3E"),
   water: ColorUtils.multRGB(Color(0.8, 0.8, 1, 1), 0.2),
   stars: ColorUtils.multRGB(Color(1, 0.8, 0.8, 1), 1)
 };
@@ -41,19 +42,34 @@ let Cloud = () => {
 let Boat = (world, buoyancy) => {
   let bodyDef = new box2d.b2BodyDef();
   bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
-  bodyDef.position.Set(10, -20);
+  bodyDef.position.Set(11, -6);
   let body = world.CreateBody(bodyDef);
   let shape = new box2d.b2PolygonShape();
   let fixtureDef = new box2d.b2FixtureDef();
-  shape.Set([
-    new box2d.b2Vec2(-2.5, -1),
-    new box2d.b2Vec2(-2.5, 1),
-    new box2d.b2Vec2(2.5, 1),
-    new box2d.b2Vec2(3.5, -1)
-  ], 4);
-  fixtureDef.shape = shape;
-  fixtureDef.density = 0.3;
+  fixtureDef.density = 1;
   fixtureDef.friction = 0.2;
+  fixtureDef.filter.maskBits = 0b10;
+  fixtureDef.shape = shape;
+  shape.Set([
+    new box2d.b2Vec2(-2.5, -.75),
+    new box2d.b2Vec2(-2.3, -.75),
+    new box2d.b2Vec2(-2.3, .5),
+    new box2d.b2Vec2(-2.5, .5)
+  ], 4);
+  body.CreateFixture(fixtureDef);
+  shape.Set([
+    new box2d.b2Vec2(2.3, .5),
+    new box2d.b2Vec2(2.3, -.75),
+    new box2d.b2Vec2(3.5, -.75),
+    new box2d.b2Vec2(2.5, .75)
+  ], 4);
+  body.CreateFixture(fixtureDef);
+  shape.Set([
+    new box2d.b2Vec2(-2.5, .75),
+    new box2d.b2Vec2(-2.5, .5),
+    new box2d.b2Vec2(2.5, .5),
+    new box2d.b2Vec2(2.5, .75)
+  ], 4);
   body.CreateFixture(fixtureDef);
   buoyancy.AddBody(body);
 
@@ -120,34 +136,48 @@ export let PlayState = (game, transition) => {
   let buoyancy = new box2d.b2BuoyancyController();
   buoyancy.normal.Set(0, -1);
   buoyancy.offset = 0;
-  buoyancy.density = 2;
+  buoyancy.density = 5;
   buoyancy.linearDrag = 5;
   buoyancy.angularDrag = 2;
   
   let world = new box2d.b2World(new box2d.b2Vec2(0, 15));
   let islandDef = new box2d.b2BodyDef();
-  islandDef.position.Set(0, .25);
+  islandDef.position.Set(0, 0);
   let island = world.CreateBody(islandDef);
   let islandFixtureDef = new box2d.b2FixtureDef();
   let islandShape = new box2d.b2PolygonShape();
   islandFixtureDef.shape = islandShape;
   islandFixtureDef.friction = 0.3;
-  islandShape.SetAsBox(5, 1.5);
+  islandFixtureDef.filter.categoryBits = 0b11;
+  islandFixtureDef.filter.maskBits = 0b11111111;
+  islandShape.Set([
+    new box2d.b2Vec2(5, 1.75),
+    new box2d.b2Vec2(-5, 1.75),
+    new box2d.b2Vec2(-5, -1.25),
+    new box2d.b2Vec2(5, -1.25)], 4);
   island.CreateFixture(islandFixtureDef);
   islandShape.Set([
-    new box2d.b2Vec2(-5, -1.5),
-    new box2d.b2Vec2(-10, 0),
-    new box2d.b2Vec2(-5, 0)], 3);
+    new box2d.b2Vec2(-5, -1.25),
+    new box2d.b2Vec2(-10, .25),
+    new box2d.b2Vec2(-5, .25)], 3);
   island.CreateFixture(islandFixtureDef);
   islandShape.Set([
-    new box2d.b2Vec2(-10, 0),
-    new box2d.b2Vec2(-27, 2),
-    new box2d.b2Vec2(-10, 2)], 3);
+    new box2d.b2Vec2(-10, .25),
+    new box2d.b2Vec2(-27, 2.25),
+    new box2d.b2Vec2(-10, 2.25)], 3);
   island.CreateFixture(islandFixtureDef);
   islandShape.Set([
-    new box2d.b2Vec2(5, -1.5),
-    new box2d.b2Vec2(10, 0),
-    new box2d.b2Vec2(5, 0)], 3);
+    new box2d.b2Vec2(5, -1.25),
+    new box2d.b2Vec2(10, .25),
+    new box2d.b2Vec2(5, .25)], 3);
+  island.CreateFixture(islandFixtureDef);
+  islandFixtureDef.filter.categoryBits = 0b01;
+  islandShape.Set([
+    new box2d.b2Vec2(5, -.3),
+    new box2d.b2Vec2(13, -.3),
+    new box2d.b2Vec2(13, -.7),
+    new box2d.b2Vec2(5, -.7)
+  ], 4);
   island.CreateFixture(islandFixtureDef);
   
   let playerDef = new box2d.b2BodyDef();
@@ -158,8 +188,9 @@ export let PlayState = (game, transition) => {
   playerBox.SetAsBox(1, 1);
   let playerFixtureDef = new box2d.b2FixtureDef();
   playerFixtureDef.shape = playerBox;
-  playerFixtureDef.density = 3;
+  playerFixtureDef.density = 7;
   playerFixtureDef.friction = 0.7;
+  playerFixtureDef.filter.categoryBits = 0b1111111;
   playerBody.CreateFixture(playerFixtureDef);
   buoyancy.AddBody(playerBody);
 
@@ -228,10 +259,7 @@ export let PlayState = (game, transition) => {
 
       opMatrix.load.scale(40, 40, 1); // 1 game unit = 40 pixels
       matrix.multiply(opMatrix);
-      
-      self.drawIsland();
-      self.drawBody(boat, self.drawBoat);
-      
+            
       matStack.push(matrix);
       opMatrix.load.translate(camera.x/40.0, camera.y/40.0, 0);
       matrix.multiply(opMatrix);
@@ -284,6 +312,8 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix); // pop moon matrix
       matStack.pop(matrix); // pop celestial matrix
 
+      self.drawIsland();
+      self.drawBody(boat, self.drawBoat);
       self.drawBody(playerBody, self.drawPlayer);
       matStack.pop(matrix);
     },
@@ -303,10 +333,13 @@ export let PlayState = (game, transition) => {
     },
     drawBoat() {
       console.log(boat.GetPosition().x + ", " + boat.GetPosition().y);
-      shapes.drawColoredRect(colors.boatStake, -2.5, -1, 2.5, 1);
-      shapes.drawColoredTriangle(colors.boatStake, 3.5, -1, 2.5, -1, 2.5, 1);
+      shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
+      shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
     },
     drawIsland() {
+      shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
+      shapes.drawColoredRect(colors.dock, 14, -.7, 14.4, .5);
+      
       shapes.drawColoredRect(colors.dirt, -5, -1.25, 5, .25);
       shapes.drawColoredRect(colors.boatStake, 7.5, 0, 8, -2);
       shapes.drawColoredRect(colors.rope, 7.45, -1.4, 8.05, -1.9);
