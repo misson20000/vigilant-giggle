@@ -2581,8 +2581,10 @@
 	      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
 	    },
 	    drawBoat: function drawBoat() {
+	      shapes.useMaterial(holoMaterial);
 	      shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
 	      shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
+	      shapes.useMaterial(shapesMaterial);
 	    },
 	    drawIsland: function drawIsland() {
 	      shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
@@ -2597,10 +2599,10 @@
 	      shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
 	      shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
 	
-	      //      shapes.useMaterial(holoMaterial);
+	      shapes.useMaterial(holoMaterial);
 	      shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25);
 	      shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7);
-	      //      shapes.useMaterial(shapesMaterial);
+	      shapes.useMaterial(shapesMaterial);
 	    },
 	    drawSun: function drawSun() {
 	      matStack.push(matrix);

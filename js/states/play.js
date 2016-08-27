@@ -2,6 +2,7 @@ import {AssetManager} from "../assetmgr.js";
 import {Colors, Color, ColorUtils} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {Keyboard} from "../keyboard.js";
+import {Boat} from "../objects/boat.js";
 import * as box2d from "box2d-html5";
 
 let colors = {
@@ -37,63 +38,6 @@ let Cloud = () => {
     }
   };
   return self;
-};
-
-let Boat = (world, buoyancy) => {
-  let bodyDef = new box2d.b2BodyDef();
-  bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
-  bodyDef.position.Set(12, -1);
-  let body = world.CreateBody(bodyDef);
-  let shape = new box2d.b2PolygonShape();
-  let fixtureDef = new box2d.b2FixtureDef();
-  fixtureDef.density = 0.1;
-  fixtureDef.friction = 0.2;
-  fixtureDef.filter.maskBits = 0b10;
-  fixtureDef.shape = shape;
-  shape.Set([
-    new box2d.b2Vec2(-2.5, -.75),
-    new box2d.b2Vec2(-2.3, -.75),
-    new box2d.b2Vec2(-2.3, .5),
-    new box2d.b2Vec2(-2.5, .5)
-  ], 4);
-  body.CreateFixture(fixtureDef);
-  shape.Set([
-    new box2d.b2Vec2(2.3, .5),
-    new box2d.b2Vec2(2.3, -.75),
-    new box2d.b2Vec2(3.5, -.75),
-    new box2d.b2Vec2(2.5, .75)
-  ], 4);
-  body.CreateFixture(fixtureDef);
-  shape.Set([
-    new box2d.b2Vec2(-2.5, .75),
-    new box2d.b2Vec2(-2.5, .5),
-    new box2d.b2Vec2(2.5, .5),
-    new box2d.b2Vec2(2.5, .75)
-  ], 4);
-  body.CreateFixture(fixtureDef);
-  fixtureDef.density = 10;
-  shape.Set([
-    new box2d.b2Vec2(-.5, 10),
-    new box2d.b2Vec2(.5, 10),
-    new box2d.b2Vec2(.5, 11),
-    new box2d.b2Vec2(-.5, 10)
-  ], 4);
-  body.CreateFixture(fixtureDef);
-  fixtureDef.density = 0;
-  shape.Set([
-    new box2d.b2Vec2(-2.3, .5),
-    new box2d.b2Vec2(2.3, .5),
-    new box2d.b2Vec2(2.3, 0),
-    new box2d.b2Vec2(-2.3, 0)
-  ], 4);
-  fixtureDef.isSensor = true;
-  let sensor = body.CreateFixture(fixtureDef);
-  buoyancy.AddBody(body);
-
-  return {
-    body,
-    sensor
-  };
 };
 
 export let PlayState = (game, transition) => {
@@ -159,8 +103,11 @@ export let PlayState = (game, transition) => {
   buoyancy.density = 5;
   buoyancy.linearDrag = 5;
   buoyancy.angularDrag = 2;
+
+  let objects = [];
   
   let world = new box2d.b2World(new box2d.b2Vec2(0, 15));
+//  objects.push(BeginningIsland(world));
   let islandDef = new box2d.b2BodyDef();
   islandDef.position.Set(0, 0);
   let island = world.CreateBody(islandDef);
@@ -214,26 +161,32 @@ export let PlayState = (game, transition) => {
   playerBody.CreateFixture(playerFixtureDef);
   buoyancy.AddBody(playerBody);
 
-  let boat = Boat(world, buoyancy);
-  let boatForce = new box2d.b2Vec2(100, 0);
-  let b2zero = new box2d.b2Vec2(0, 0);
+  objects.push(Boat(world, buoyancy, playerBody, true));
   
   world.AddController(buoyancy);
   world.SetContactListener({
     BeginContact(contact) {
       let a = contact.GetFixtureA();
       let b = contact.GetFixtureB();
-      if((a == boat.sensor && b.GetBody() == playerBody)
-         || (b == boat.sensor && a.GetBody() == playerBody)) {
-        boat.riding = true;
+      let aData = a.GetBody().GetUserData();
+      let bData = b.GetBody().GetUserData();
+      if(aData && aData.BeginContact) {
+        aData.BeginContact(a, b);
+      }
+      if(bData && bData.BeginContact) {
+        bData.BeginContact(b, a);
       }
     },
     EndContact(contact) {
-      let a = contact.GetFixtureA();
+            let a = contact.GetFixtureA();
       let b = contact.GetFixtureB();
-      if((a == boat.sensor && b.GetBody() == playerBody)
-         || (b == boat.sensor && a.GetBody() == playerBody)) {
-        boat.riding = false;
+      let aData = a.GetBody().GetUserData();
+      let bData = b.GetBody().GetUserData();
+      if(aData && aData.BeginContact) {
+        aData.BeginContact(a, b);
+      }
+      if(bData && bData.EndContact) {
+        bData.EndContact(b, a);
       }
     },
     PreSolve(contact, manifold) {
@@ -252,6 +205,15 @@ export let PlayState = (game, transition) => {
   
   let self = {
     initialize() {
+      // simulate 2 seconds of physics to give time for stuff to settle
+      for(let i = 0; i < 2000; i+= 5) {
+        world.Step(5.0 / 1000.0, 8, 3);
+      }
+      for(let i = 0; i < objects[i]; i++) {
+        if(objects[i].isHologram) {
+          objects[i].body.SetActive(false);
+        }
+      }
     },
     dayCycle() {
       return time / 180000.0;
@@ -358,7 +320,20 @@ export let PlayState = (game, transition) => {
 
       self.drawIsland();
       self.drawBody(playerBody, self.drawPlayer);
-      self.drawBody(boat.body, self.drawBoat);
+      for(let i = 0; i < objects.length; i++) {
+        let body = objects[i].body;
+        matStack.push(matrix);
+        opMatrix.load.translate(body.GetPosition().x, body.GetPosition().y, 0);
+        matrix.multiply(opMatrix);
+        opMatrix.load.rotate(body.GetAngleRadians());
+        matrix.multiply(opMatrix);
+        if(objects[i].isHologram) {
+          shapes.useMaterial(holoMaterial);
+        }
+        objects[i].draw(shapes);
+        shapes.useMaterial(shapesMaterial);
+        matStack.pop(matrix);
+      }
       matStack.pop(matrix);
     },
     drawBody(body, cb) {
@@ -367,19 +342,11 @@ export let PlayState = (game, transition) => {
       matrix.multiply(opMatrix);
       opMatrix.load.rotate(body.GetAngleRadians());
       matrix.multiply(opMatrix);
-
       cb();
-
       matStack.pop(matrix);
     },
     drawPlayer() {
       shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
-    },
-    drawBoat() {
-      shapes.useMaterial(holoMaterial);
-      shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
-      shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
-      shapes.useMaterial(shapesMaterial);
     },
     drawIsland() {
       shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
@@ -444,8 +411,10 @@ export let PlayState = (game, transition) => {
         playerBody.SetAngularVelocity(-2);
       }
 
-      if(boat.riding) {
-        boat.body.ApplyForce(boatForce, boat.body.GetPosition());
+      for(let i = 0; i < objects.length; i++) {
+        if(objects[i].tick) {
+          objects[i].tick();
+        }
       }
       
       matStack.reset();
