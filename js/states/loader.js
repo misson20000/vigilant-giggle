@@ -32,15 +32,13 @@ export let LoaderState = (game) => {
   
   return {
     initialize() {
-      Promise.all([AssetManager.downloadAssetGroup("game")])
-        .then(() => {
+      AssetManager.downloadAssetGroup("game").then(() => {
         transition.to(PlayState(game, transition), 500, 100);
       }, (err) => {
         console.log("failed to load assets: " + err);
         errored = true;
         error = err;
       });
-      transition.to(PlayState(game, transition), 500, 100);
     },
 
     tick(delta) {

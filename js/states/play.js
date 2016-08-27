@@ -13,6 +13,10 @@ let colors = {
   sun: Color(1, 1, 0, 1),
   moon: Color(0.8, 0.8, 0.8, 1),
   player: Color(0.8, 0.8, 0.8, 1),
+  houseBody: Color(0.8, 0.7, 0.7, 1),
+  houseRoof: Color("#5E3F1B"),
+  boatStake: Color("#D99445"),
+  rope: Color("#F5C998"),
   water: ColorUtils.multRGB(Color(0.8, 0.8, 1, 1), 0.2),
   stars: ColorUtils.multRGB(Color(1, 0.8, 0.8, 1), 1)
 };
@@ -34,15 +38,46 @@ let Cloud = () => {
   return self;
 };
 
+let Boat = (world, buoyancy) => {
+  let bodyDef = new box2d.b2BodyDef();
+  bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
+  bodyDef.position.Set(10, -20);
+  let body = world.CreateBody(bodyDef);
+  let shape = new box2d.b2PolygonShape();
+  let fixtureDef = new box2d.b2FixtureDef();
+  shape.Set([
+    new box2d.b2Vec2(-2.5, -1),
+    new box2d.b2Vec2(-2.5, 1),
+    new box2d.b2Vec2(2.5, 1),
+    new box2d.b2Vec2(3.5, -1)
+  ], 4);
+  fixtureDef.shape = shape;
+  fixtureDef.density = 0.3;
+  fixtureDef.friction = 0.2;
+  body.CreateFixture(fixtureDef);
+  buoyancy.AddBody(body);
+
+  return body;
+};
+
 export let PlayState = (game, transition) => {
+  let time = 0;
+  
   let render = game.render;
   let shapesMaterial = render.createMaterial(AssetManager.getAsset("base.shader.flat.color"), {
     matrix: render.pixelMatrix
   });
+  let holoMaterial = render.createMaterial(AssetManager.getAsset("game.shader.hologram"), {
+    matrix: render.pixelMatrix,
+    time: () => {
+      return time;
+    },
+    pixwidth: render.fbwidth,
+    pixheight: render.fbheight
+  });
   let font = render.createFontRenderer(AssetManager.getAsset("base.font.open_sans"),
                                        AssetManager.getAsset("base.shader.flat.texcolor"));
   let fb = render.createFramebuffer(100); // 100 pixels of padding
-  let time = 0;
   let postMatrix = Mat4.create();
   let post = render.createMaterial(AssetManager.getAsset("game.shader.reflection"), {
     framebuffer: fb.getTexture(),
@@ -93,19 +128,27 @@ export let PlayState = (game, transition) => {
   let islandDef = new box2d.b2BodyDef();
   islandDef.position.Set(0, .25);
   let island = world.CreateBody(islandDef);
+  let islandFixtureDef = new box2d.b2FixtureDef();
   let islandShape = new box2d.b2PolygonShape();
+  islandFixtureDef.shape = islandShape;
+  islandFixtureDef.friction = 0.3;
   islandShape.SetAsBox(5, 1.5);
-  island.CreateFixture2(islandShape, 0.0);
+  island.CreateFixture(islandFixtureDef);
   islandShape.Set([
     new box2d.b2Vec2(-5, -1.5),
     new box2d.b2Vec2(-10, 0),
     new box2d.b2Vec2(-5, 0)], 3);
-  island.CreateFixture2(islandShape, 0.0);
+  island.CreateFixture(islandFixtureDef);
+  islandShape.Set([
+    new box2d.b2Vec2(-10, 0),
+    new box2d.b2Vec2(-27, 2),
+    new box2d.b2Vec2(-10, 2)], 3);
+  island.CreateFixture(islandFixtureDef);
   islandShape.Set([
     new box2d.b2Vec2(5, -1.5),
     new box2d.b2Vec2(10, 0),
     new box2d.b2Vec2(5, 0)], 3);
-  island.CreateFixture2(islandShape, 0.0);
+  island.CreateFixture(islandFixtureDef);
   
   let playerDef = new box2d.b2BodyDef();
   playerDef.type = box2d.b2BodyType.b2_dynamicBody;
@@ -115,10 +158,13 @@ export let PlayState = (game, transition) => {
   playerBox.SetAsBox(1, 1);
   let playerFixtureDef = new box2d.b2FixtureDef();
   playerFixtureDef.shape = playerBox;
-  playerFixtureDef.density = 1;
-  playerFixtureDef.friction = 0.6;
+  playerFixtureDef.density = 3;
+  playerFixtureDef.friction = 0.7;
   playerBody.CreateFixture(playerFixtureDef);
   buoyancy.AddBody(playerBody);
+
+  let boat = Boat(world, buoyancy);
+  
   world.AddController(buoyancy);
   
   let kb = Keyboard.create();
@@ -164,6 +210,10 @@ export let PlayState = (game, transition) => {
       
       opMatrix.load.translate(render.width()/2, render.height(), 0);
       matrix.multiply(opMatrix);
+
+      matStack.push(matrix);
+      opMatrix.load.translate(camera.x, camera.y, 0);
+      matrix.multiply(opMatrix);
       
       self.starColor();
       for(let i = 0; i < stars.length; i++) {
@@ -174,11 +224,17 @@ export let PlayState = (game, transition) => {
                                (render.width() * star[0]) + 1.0 - render.width()/2,
                                (-render.height() * star[1]) + 1.0);
       }
+      matStack.pop(matrix);
 
       opMatrix.load.scale(40, 40, 1); // 1 game unit = 40 pixels
       matrix.multiply(opMatrix);
       
       self.drawIsland();
+      self.drawBody(boat, self.drawBoat);
+      
+      matStack.push(matrix);
+      opMatrix.load.translate(camera.x/40.0, camera.y/40.0, 0);
+      matrix.multiply(opMatrix);
 
       matStack.push(matrix);
       opMatrix.load.rotate(self.dayCycle()*Math.PI*2);
@@ -226,23 +282,44 @@ export let PlayState = (game, transition) => {
         self.drawArc(skyColor, .5, 0, Math.PI*2);
       }
       matStack.pop(matrix); // pop moon matrix
+      matStack.pop(matrix); // pop celestial matrix
 
-      opMatrix.load.translate(playerBody.GetPosition().x, playerBody.GetPosition().y, 0);
-      matrix.multiply(opMatrix);
-      console.log(playerBody.GetPosition().x + ", " + playerBody.GetPosition().y);
-      opMatrix.load.rotate(playerBody.GetAngleRadians());
-      matrix.multiply(opMatrix);
-      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
-      
+      self.drawBody(playerBody, self.drawPlayer);
       matStack.pop(matrix);
+    },
+    drawBody(body, cb) {
+      matStack.push(matrix);
+      opMatrix.load.translate(body.GetPosition().x, body.GetPosition().y, 0);
+      matrix.multiply(opMatrix);
+      opMatrix.load.rotate(body.GetAngleRadians());
+      matrix.multiply(opMatrix);
+
+      cb();
+
+      matStack.pop(matrix);
+    },
+    drawPlayer() {
+      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
+    },
+    drawBoat() {
+      console.log(boat.GetPosition().x + ", " + boat.GetPosition().y);
+      shapes.drawColoredRect(colors.boatStake, -2.5, -1, 2.5, 1);
+      shapes.drawColoredTriangle(colors.boatStake, 3.5, -1, 2.5, -1, 2.5, 1);
     },
     drawIsland() {
       shapes.drawColoredRect(colors.dirt, -5, -1.25, 5, .25);
+      shapes.drawColoredRect(colors.boatStake, 7.5, 0, 8, -2);
+      shapes.drawColoredRect(colors.rope, 7.45, -1.4, 8.05, -1.9);
       shapes.drawColoredTriangle(colors.grass, -5, -1.25, -10, .25, -5, .25);
       shapes.drawColoredTriangle(colors.dirt, -5, -1, -10, .5, -5, .5);
       shapes.drawColoredTriangle(colors.grass, 5, -1.25, 10, .25, 5, .25);
       shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
       shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
+      
+//      shapes.useMaterial(holoMaterial);
+      shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25);
+      shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7);
+//      shapes.useMaterial(shapesMaterial);
     },
     drawSun() {
       matStack.push(matrix);
@@ -278,6 +355,9 @@ export let PlayState = (game, transition) => {
         b2timer-= 5;
       }
 
+      camera.x = playerBody.GetPosition().x * 40;
+      camera.y = playerBody.GetPosition().y * 40;
+      
       if(binds.right.isPressed()) {
         playerBody.SetAngularVelocity(2);
       }
@@ -293,13 +373,15 @@ export let PlayState = (game, transition) => {
       shapes.useMaterial(shapesMaterial);
 
       fb.bind();
+      matStack.push(matrix);
       opMatrix.load.translate(-camera.x, 0, 0);
       matrix.multiply(opMatrix);
       self.drawScene();
       shapes.flush();
+      matStack.pop(matrix);
       fb.unbind();
       
-      opMatrix.load.translate(0, -render.height()/2-camera.y, 0);
+      opMatrix.load.translate(-camera.x, -render.height()/2-camera.y, 0);
       matrix.multiply(opMatrix);
       self.drawScene();
       shapes.flush();
