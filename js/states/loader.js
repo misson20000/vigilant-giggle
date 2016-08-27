@@ -2,7 +2,7 @@ import {AssetManager} from "../assetmgr.js";
 import {Colors, Color} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {DiamondTransition} from "../transitions.js";
-import {MenuState} from "./menu.js";
+import {PlayState} from "./play.js";
 
 export let LoaderState = (game) => {
   let render = game.render;
@@ -32,17 +32,15 @@ export let LoaderState = (game) => {
   
   return {
     initialize() {
-      Promise.all([AssetManager.downloadAssetGroup("sfxtest"),
-                   AssetManager.downloadAssetGroup("mustest"),
-                   AssetManager.downloadAssetGroup("posttest"),
-                   AssetManager.downloadAssetGroup("posttest2")])
+      Promise.all([AssetManager.downloadAssetGroup("game")])
         .then(() => {
-        transition.to(MenuState(game, transition), 500, 100);
+        transition.to(PlayState(game, transition), 500, 100);
       }, (err) => {
         console.log("failed to load assets: " + err);
         errored = true;
         error = err;
       });
+      transition.to(PlayState(game, transition), 500, 100);
     },
 
     tick(delta) {
