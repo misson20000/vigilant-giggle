@@ -64,19 +64,19 @@ export let DiamondTransition = (game, dir) => {
               
               params[i++] = x - sz;
               params[i++] = y;
-              params[i++] = 0;
+              params[i++] = 1;
               
               params[i++] = x;
               params[i++] = y - sz;
-              params[i++] = 0;
+              params[i++] = 1;
               
               params[i++] = x;
               params[i++] = y + sz;
-              params[i++] = 0;
+              params[i++] = 1;
               
               params[i++] = x + sz;
               params[i++] = y;
-              params[i++] = 0;
+              params[i++] = 1;
               material.drawQuad(params);
             }
           }

@@ -3,9 +3,10 @@ import {Colors, Color, ColorUtils} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {Keyboard} from "../keyboard.js";
 import {Boat} from "../objects/boat.js";
+import {BeginningIsland, BeginningHouse} from "../objects/begisland.js";
 import * as box2d from "box2d-html5";
 
-let colors = {
+export let colors = {
   bg: Color("#2698FC"),
   cloud: Color(0.8, 0.8, 1, 1),
   fg: Color(0.8, 0.8, 1, 1),
@@ -107,45 +108,9 @@ export let PlayState = (game, transition) => {
   let objects = [];
   
   let world = new box2d.b2World(new box2d.b2Vec2(0, 15));
-//  objects.push(BeginningIsland(world));
-  let islandDef = new box2d.b2BodyDef();
-  islandDef.position.Set(0, 0);
-  let island = world.CreateBody(islandDef);
-  let islandFixtureDef = new box2d.b2FixtureDef();
-  let islandShape = new box2d.b2PolygonShape();
-  islandFixtureDef.shape = islandShape;
-  islandFixtureDef.friction = 0.3;
-  islandFixtureDef.filter.categoryBits = 0b11;
-  islandFixtureDef.filter.maskBits = 0b11111111;
-  islandShape.Set([
-    new box2d.b2Vec2(5, 1.75),
-    new box2d.b2Vec2(-5, 1.75),
-    new box2d.b2Vec2(-5, -1.25),
-    new box2d.b2Vec2(5, -1.25)], 4);
-  island.CreateFixture(islandFixtureDef);
-  islandShape.Set([
-    new box2d.b2Vec2(-5, -1.25),
-    new box2d.b2Vec2(-10, .25),
-    new box2d.b2Vec2(-5, .25)], 3);
-  island.CreateFixture(islandFixtureDef);
-  islandShape.Set([
-    new box2d.b2Vec2(-10, .25),
-    new box2d.b2Vec2(-27, 2.25),
-    new box2d.b2Vec2(-10, 2.25)], 3);
-  island.CreateFixture(islandFixtureDef);
-  islandShape.Set([
-    new box2d.b2Vec2(5, -1.25),
-    new box2d.b2Vec2(10, .25),
-    new box2d.b2Vec2(5, .25)], 3);
-  island.CreateFixture(islandFixtureDef);
-  islandFixtureDef.filter.categoryBits = 0b01;
-  islandShape.Set([
-    new box2d.b2Vec2(5, -.3),
-    new box2d.b2Vec2(10, -.3),
-    new box2d.b2Vec2(10, -.7),
-    new box2d.b2Vec2(5, -.7)
-  ], 4);
-  island.CreateFixture(islandFixtureDef);
+  let island = BeginningIsland(world);
+  objects.push(island);
+  objects.push(BeginningHouse(island, world));
 
   let playerDef = new box2d.b2BodyDef();
   playerDef.type = box2d.b2BodyType.b2_dynamicBody;
@@ -318,7 +283,6 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix); // pop moon matrix
       matStack.pop(matrix); // pop celestial matrix
 
-      self.drawIsland();
       self.drawBody(playerBody, self.drawPlayer);
       for(let i = 0; i < objects.length; i++) {
         let body = objects[i].body;
@@ -346,25 +310,7 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix);
     },
     drawPlayer() {
-      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
-    },
-    drawIsland() {
-      shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
-      shapes.drawColoredRect(colors.dock, 14, -.7, 14.4, .5);
-      
-      shapes.drawColoredRect(colors.dirt, -5, -1.25, 5, .25);
-      shapes.drawColoredRect(colors.boatStake, 7.5, 0, 8, -2);
-      shapes.drawColoredRect(colors.rope, 7.45, -1.4, 8.05, -1.9);
-      shapes.drawColoredTriangle(colors.grass, -5, -1.25, -10, .25, -5, .25);
-      shapes.drawColoredTriangle(colors.dirt, -5, -1, -10, .5, -5, .5);
-      shapes.drawColoredTriangle(colors.grass, 5, -1.25, 10, .25, 5, .25);
-      shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
-      shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
-      
-      shapes.useMaterial(holoMaterial);
-      shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25);
-      shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7);
-      shapes.useMaterial(shapesMaterial);
+      shapes.drawColoredRect(colors.player, -1, -1, 1, 1, 0.5);
     },
     drawSun() {
       matStack.push(matrix);

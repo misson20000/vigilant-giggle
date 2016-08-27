@@ -71,8 +71,8 @@ export let Boat = (world, buoyancy, player, isHologram) => {
       }      
     },
     draw(shapes) {
-      shapes.drawColoredRect(color, -2.5, -.75, 2.5, .75);
-      shapes.drawColoredTriangle(color, 3.5, -.75, 2.5, -.75, 2.5, .75);
+      shapes.drawColoredRect(color, -2.5, -.75, 2.5, .75, 0.5);
+      shapes.drawColoredTriangle(color, 3.5, -.75, 2.5, -.75, 2.5, .75, 0.5);
     },
     tick() {
       if(riding) {

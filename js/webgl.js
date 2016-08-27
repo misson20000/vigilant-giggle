@@ -20,6 +20,9 @@ export let WebGLRenderer = (game, canvas, gl) => {
     throw "Could not open WebGL context";
   }
   gl.enable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);
+  gl.clearDepth(0);
+  gl.depthFunc(gl.GEQUAL);
   gl.disable(gl.STENCIL_TEST);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.stencilFunc(gl.ALWAYS, 0, 0xFF); // fill stencil buffer with ones
@@ -192,27 +195,28 @@ export let WebGLRenderer = (game, canvas, gl) => {
           let i = 0;
           let x = (width-render.width())/(2*width);
           let y = (height-render.height())/(2*height);
+          let z = 0.9;
           attributes[i++] = 0;
           attributes[i++] = 0;
-          attributes[i++] = 0;
+          attributes[i++] = z;
           attributes[i++] = x;
           attributes[i++] = 1-y;
 
           attributes[i++] = render.width();
           attributes[i++] = 0;
-          attributes[i++] = 0;
+          attributes[i++] = z;
           attributes[i++] = 1-x;
           attributes[i++] = 1-y;
           
           attributes[i++] = 0;
           attributes[i++] = render.height();
-          attributes[i++] = 0;
+          attributes[i++] = z;
           attributes[i++] = x;
           attributes[i++] = y;
           
           attributes[i++] = render.width();
           attributes[i++] = render.height();
-          attributes[i++] = 0;
+          attributes[i++] = z;
           attributes[i++] = 1-x;
           attributes[i++] = y;
           return attributes;
@@ -507,52 +511,64 @@ export let WebGLRenderer = (game, canvas, gl) => {
         useMatrix(mat) {
           tform.useMatrix(mat);
         },
-        drawColoredRect(color, x1, y1, x2, y2) {
+        drawColoredRect(color, x1, y1, x2, y2, z) {
+          if(z === undefined) {
+            z = 0;
+          }
           let i = 0;
           params[i++] = color;
-          i = tform.into(params, i, x1, y1, 0);
-          i = tform.into(params, i, x2, y1, 0);
-          i = tform.into(params, i, x1, y2, 0);
-          i = tform.into(params, i, x2, y2, 0);          
+          i = tform.into(params, i, x1, y1, z);
+          i = tform.into(params, i, x2, y1, z);
+          i = tform.into(params, i, x1, y2, z);
+          i = tform.into(params, i, x2, y2, z);          
           material.drawQuad(params);
         },
-        drawColoredTriangle(color, x1, y1, x2, y2, x3, y3) {
+        drawColoredTriangle(color, x1, y1, x2, y2, x3, y3, z) {
+          if(z === undefined) {
+            z = 0;
+          }
           let i = 0;
           params[i++] = color;
-          i = tform.into(params, i, x1, y1, 0);
-          i = tform.into(params, i, x2, y2, 0);
-          i = tform.into(params, i, x3, y3, 0);
+          i = tform.into(params, i, x1, y1, z);
+          i = tform.into(params, i, x2, y2, z);
+          i = tform.into(params, i, x3, y3, z);
           material.drawTri(params);
         },
-        drawTexturedRect(x1, y1, x2, y2, tx1, ty1, tx2, ty2) {
+        drawTexturedRect(x1, y1, x2, y2, tx1, ty1, tx2, ty2, z) {
+          if(z === undefined) {
+            z = 0;
+          }
           let i = 0;
-          i = tform.into(params, i, x1, y1, 0);
+          i = tform.into(params, i, x1, y1, z);
           params[i++] = tx1;
           params[i++] = ty1;
-          i = tform.into(params, i, x2, y1, 0);
+          i = tform.into(params, i, x2, y1, z);
           params[i++] = tx2;
           params[i++] = ty1;
-          i = tform.into(params, i, x1, y2, 0);
+          i = tform.into(params, i, x1, y2, z);
           params[i++] = tx1;
           params[i++] = ty2;
-          i = tform.into(params, i, x2, y2, 0);          
+          i = tform.into(params, i, x2, y2, z);          
           params[i++] = tx2;
           params[i++] = ty2;
           material.drawQuad(params);
         },
-        drawTexturedAndColoredRect(c, x1, y1, x2, y2, tx1, ty1, tx2, ty2) {
+        drawTexturedAndColoredRect(c, x1, y1, x2, y2, tx1, ty1, tx2, ty2, z) {
+          if(z === undefined) {
+            z = 0;
+          }
           let i = 0;
           params[i++] = c;
-          i = tform.into(params, i, x1, y1, 0);
+          i = tform.into(params, i, x1, y1, z);
           params[i++] = tx1;
           params[i++] = ty1;
-          i = tform.into(params, i, x2, y1, 0);
+          i = tform.into(params, i, x2, y1, z);
           params[i++] = tx2;
           params[i++] = ty1;
-          i = tform.into(params, i, x1, y2, 0);
+          i = tform.into(params, i, x1, y2, z);
           params[i++] = tx1;
           params[i++] = ty2;
-          i = tform.into(params, i, x2, y2, 0);          
+          i = tform.into(params, i, x2, y2, z);          
           params[i++] = tx2;
           params[i++] = ty2;
           material.drawQuad(params);
