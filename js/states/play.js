@@ -42,11 +42,11 @@ let Cloud = () => {
 let Boat = (world, buoyancy) => {
   let bodyDef = new box2d.b2BodyDef();
   bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
-  bodyDef.position.Set(11, -6);
+  bodyDef.position.Set(12, -1);
   let body = world.CreateBody(bodyDef);
   let shape = new box2d.b2PolygonShape();
   let fixtureDef = new box2d.b2FixtureDef();
-  fixtureDef.density = 1;
+  fixtureDef.density = 0.1;
   fixtureDef.friction = 0.2;
   fixtureDef.filter.maskBits = 0b10;
   fixtureDef.shape = shape;
@@ -69,6 +69,14 @@ let Boat = (world, buoyancy) => {
     new box2d.b2Vec2(-2.5, .5),
     new box2d.b2Vec2(2.5, .5),
     new box2d.b2Vec2(2.5, .75)
+  ], 4);
+  body.CreateFixture(fixtureDef);
+  fixtureDef.density = 10;
+  shape.Set([
+    new box2d.b2Vec2(-.5, 10),
+    new box2d.b2Vec2(.5, 10),
+    new box2d.b2Vec2(.5, 11),
+    new box2d.b2Vec2(-.5, 10)
   ], 4);
   body.CreateFixture(fixtureDef);
   buoyancy.AddBody(body);
@@ -174,8 +182,8 @@ export let PlayState = (game, transition) => {
   islandFixtureDef.filter.categoryBits = 0b01;
   islandShape.Set([
     new box2d.b2Vec2(5, -.3),
-    new box2d.b2Vec2(13, -.3),
-    new box2d.b2Vec2(13, -.7),
+    new box2d.b2Vec2(10, -.3),
+    new box2d.b2Vec2(10, -.7),
     new box2d.b2Vec2(5, -.7)
   ], 4);
   island.CreateFixture(islandFixtureDef);
@@ -188,9 +196,9 @@ export let PlayState = (game, transition) => {
   playerBox.SetAsBox(1, 1);
   let playerFixtureDef = new box2d.b2FixtureDef();
   playerFixtureDef.shape = playerBox;
-  playerFixtureDef.density = 7;
+  playerFixtureDef.density = 1;
   playerFixtureDef.friction = 0.7;
-  playerFixtureDef.filter.categoryBits = 0b1111111;
+  playerFixtureDef.filter.categoryBits = 0b111111;
   playerBody.CreateFixture(playerFixtureDef);
   buoyancy.AddBody(playerBody);
 
@@ -313,8 +321,8 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix); // pop celestial matrix
 
       self.drawIsland();
-      self.drawBody(boat, self.drawBoat);
       self.drawBody(playerBody, self.drawPlayer);
+      self.drawBody(boat, self.drawBoat);
       matStack.pop(matrix);
     },
     drawBody(body, cb) {
@@ -398,6 +406,9 @@ export let PlayState = (game, transition) => {
       if(binds.left.isPressed()) {
         playerBody.SetAngularVelocity(-2);
       }
+
+//      boat.SetAngularVelocity(0);
+//      boat.SetAngleRadians(0);
       
       matStack.reset();
       matrix.load.identity();
