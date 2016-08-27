@@ -2300,11 +2300,11 @@
 	var Boat = function Boat(world, buoyancy) {
 	  var bodyDef = new box2d.b2BodyDef();
 	  bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
-	  bodyDef.position.Set(11, -6);
+	  bodyDef.position.Set(12, -1);
 	  var body = world.CreateBody(bodyDef);
 	  var shape = new box2d.b2PolygonShape();
 	  var fixtureDef = new box2d.b2FixtureDef();
-	  fixtureDef.density = 1;
+	  fixtureDef.density = 0.1;
 	  fixtureDef.friction = 0.2;
 	  fixtureDef.filter.maskBits = 2;
 	  fixtureDef.shape = shape;
@@ -2313,6 +2313,9 @@
 	  shape.Set([new box2d.b2Vec2(2.3, .5), new box2d.b2Vec2(2.3, -.75), new box2d.b2Vec2(3.5, -.75), new box2d.b2Vec2(2.5, .75)], 4);
 	  body.CreateFixture(fixtureDef);
 	  shape.Set([new box2d.b2Vec2(-2.5, .75), new box2d.b2Vec2(-2.5, .5), new box2d.b2Vec2(2.5, .5), new box2d.b2Vec2(2.5, .75)], 4);
+	  body.CreateFixture(fixtureDef);
+	  fixtureDef.density = 10;
+	  shape.Set([new box2d.b2Vec2(-.5, 10), new box2d.b2Vec2(.5, 10), new box2d.b2Vec2(.5, 11), new box2d.b2Vec2(-.5, 10)], 4);
 	  body.CreateFixture(fixtureDef);
 	  buoyancy.AddBody(body);
 	
@@ -2401,7 +2404,7 @@
 	  islandShape.Set([new box2d.b2Vec2(5, -1.25), new box2d.b2Vec2(10, .25), new box2d.b2Vec2(5, .25)], 3);
 	  island.CreateFixture(islandFixtureDef);
 	  islandFixtureDef.filter.categoryBits = 1;
-	  islandShape.Set([new box2d.b2Vec2(5, -.3), new box2d.b2Vec2(13, -.3), new box2d.b2Vec2(13, -.7), new box2d.b2Vec2(5, -.7)], 4);
+	  islandShape.Set([new box2d.b2Vec2(5, -.3), new box2d.b2Vec2(10, -.3), new box2d.b2Vec2(10, -.7), new box2d.b2Vec2(5, -.7)], 4);
 	  island.CreateFixture(islandFixtureDef);
 	
 	  var playerDef = new box2d.b2BodyDef();
@@ -2412,9 +2415,9 @@
 	  playerBox.SetAsBox(1, 1);
 	  var playerFixtureDef = new box2d.b2FixtureDef();
 	  playerFixtureDef.shape = playerBox;
-	  playerFixtureDef.density = 7;
+	  playerFixtureDef.density = 1;
 	  playerFixtureDef.friction = 0.7;
-	  playerFixtureDef.filter.categoryBits = 127;
+	  playerFixtureDef.filter.categoryBits = 63;
 	  playerBody.CreateFixture(playerFixtureDef);
 	  buoyancy.AddBody(playerBody);
 	
@@ -2532,8 +2535,8 @@
 	      matStack.pop(matrix); // pop celestial matrix
 	
 	      self.drawIsland();
-	      self.drawBody(boat, self.drawBoat);
 	      self.drawBody(playerBody, self.drawPlayer);
+	      self.drawBody(boat, self.drawBoat);
 	      matStack.pop(matrix);
 	    },
 	    drawBody: function drawBody(body, cb) {
@@ -2617,6 +2620,9 @@
 	      if (binds.left.isPressed()) {
 	        playerBody.SetAngularVelocity(-2);
 	      }
+	
+	      //      boat.SetAngularVelocity(0);
+	      //      boat.SetAngleRadians(0);
 	
 	      matStack.reset();
 	      matrix.load.identity();

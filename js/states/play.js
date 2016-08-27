@@ -79,9 +79,21 @@ let Boat = (world, buoyancy) => {
     new box2d.b2Vec2(-.5, 10)
   ], 4);
   body.CreateFixture(fixtureDef);
+  fixtureDef.density = 0;
+  shape.Set([
+    new box2d.b2Vec2(-2.3, .5),
+    new box2d.b2Vec2(2.3, .5),
+    new box2d.b2Vec2(2.3, 0),
+    new box2d.b2Vec2(-2.3, 0)
+  ], 4);
+  fixtureDef.isSensor = true;
+  let sensor = body.CreateFixture(fixtureDef);
   buoyancy.AddBody(body);
 
-  return body;
+  return {
+    body,
+    sensor
+  };
 };
 
 export let PlayState = (game, transition) => {
@@ -203,8 +215,32 @@ export let PlayState = (game, transition) => {
   buoyancy.AddBody(playerBody);
 
   let boat = Boat(world, buoyancy);
+  let boatForce = new box2d.b2Vec2(100, 0);
+  let b2zero = new box2d.b2Vec2(0, 0);
   
   world.AddController(buoyancy);
+  world.SetContactListener({
+    BeginContact(contact) {
+      let a = contact.GetFixtureA();
+      let b = contact.GetFixtureB();
+      if((a == boat.sensor && b.GetBody() == playerBody)
+         || (b == boat.sensor && a.GetBody() == playerBody)) {
+        boat.riding = true;
+      }
+    },
+    EndContact(contact) {
+      let a = contact.GetFixtureA();
+      let b = contact.GetFixtureB();
+      if((a == boat.sensor && b.GetBody() == playerBody)
+         || (b == boat.sensor && a.GetBody() == playerBody)) {
+        boat.riding = false;
+      }
+    },
+    PreSolve(contact, manifold) {
+    },
+    PostSolve(contact, impulse) {
+    }
+  });
   
   let kb = Keyboard.create();
   let binds = {
@@ -322,7 +358,7 @@ export let PlayState = (game, transition) => {
 
       self.drawIsland();
       self.drawBody(playerBody, self.drawPlayer);
-      self.drawBody(boat, self.drawBoat);
+      self.drawBody(boat.body, self.drawBoat);
       matStack.pop(matrix);
     },
     drawBody(body, cb) {
@@ -340,7 +376,6 @@ export let PlayState = (game, transition) => {
       shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
     },
     drawBoat() {
-      console.log(boat.GetPosition().x + ", " + boat.GetPosition().y);
       shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
       shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
     },
@@ -407,8 +442,9 @@ export let PlayState = (game, transition) => {
         playerBody.SetAngularVelocity(-2);
       }
 
-//      boat.SetAngularVelocity(0);
-//      boat.SetAngleRadians(0);
+      if(boat.riding) {
+        boat.body.ApplyForce(boatForce, boat.body.GetPosition());
+      }
       
       matStack.reset();
       matrix.load.identity();
