@@ -2317,9 +2317,16 @@
 	  fixtureDef.density = 10;
 	  shape.Set([new box2d.b2Vec2(-.5, 10), new box2d.b2Vec2(.5, 10), new box2d.b2Vec2(.5, 11), new box2d.b2Vec2(-.5, 10)], 4);
 	  body.CreateFixture(fixtureDef);
+	  fixtureDef.density = 0;
+	  shape.Set([new box2d.b2Vec2(-2.3, .5), new box2d.b2Vec2(2.3, .5), new box2d.b2Vec2(2.3, 0), new box2d.b2Vec2(-2.3, 0)], 4);
+	  fixtureDef.isSensor = true;
+	  var sensor = body.CreateFixture(fixtureDef);
 	  buoyancy.AddBody(body);
 	
-	  return body;
+	  return {
+	    body: body,
+	    sensor: sensor
+	  };
 	};
 	
 	var PlayState = exports.PlayState = function PlayState(game, transition) {
@@ -2422,8 +2429,28 @@
 	  buoyancy.AddBody(playerBody);
 	
 	  var boat = Boat(world, buoyancy);
+	  var boatForce = new box2d.b2Vec2(100, 0);
+	  var b2zero = new box2d.b2Vec2(0, 0);
 	
 	  world.AddController(buoyancy);
+	  world.SetContactListener({
+	    BeginContact: function BeginContact(contact) {
+	      var a = contact.GetFixtureA();
+	      var b = contact.GetFixtureB();
+	      if (a == boat.sensor && b.GetBody() == playerBody || b == boat.sensor && a.GetBody() == playerBody) {
+	        boat.riding = true;
+	      }
+	    },
+	    EndContact: function EndContact(contact) {
+	      var a = contact.GetFixtureA();
+	      var b = contact.GetFixtureB();
+	      if (a == boat.sensor && b.GetBody() == playerBody || b == boat.sensor && a.GetBody() == playerBody) {
+	        boat.riding = false;
+	      }
+	    },
+	    PreSolve: function PreSolve(contact, manifold) {},
+	    PostSolve: function PostSolve(contact, impulse) {}
+	  });
 	
 	  var kb = _keyboard.Keyboard.create();
 	  var binds = {
@@ -2536,7 +2563,7 @@
 	
 	      self.drawIsland();
 	      self.drawBody(playerBody, self.drawPlayer);
-	      self.drawBody(boat, self.drawBoat);
+	      self.drawBody(boat.body, self.drawBoat);
 	      matStack.pop(matrix);
 	    },
 	    drawBody: function drawBody(body, cb) {
@@ -2554,7 +2581,6 @@
 	      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
 	    },
 	    drawBoat: function drawBoat() {
-	      console.log(boat.GetPosition().x + ", " + boat.GetPosition().y);
 	      shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
 	      shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
 	    },
@@ -2621,8 +2647,9 @@
 	        playerBody.SetAngularVelocity(-2);
 	      }
 	
-	      //      boat.SetAngularVelocity(0);
-	      //      boat.SetAngleRadians(0);
+	      if (boat.riding) {
+	        boat.body.ApplyForce(boatForce, boat.body.GetPosition());
+	      }
 	
 	      matStack.reset();
 	      matrix.load.identity();

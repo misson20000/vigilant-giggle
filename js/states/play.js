@@ -199,7 +199,7 @@ export let PlayState = (game, transition) => {
     new box2d.b2Vec2(5, -.7)
   ], 4);
   island.CreateFixture(islandFixtureDef);
-  
+
   let playerDef = new box2d.b2BodyDef();
   playerDef.type = box2d.b2BodyType.b2_dynamicBody;
   playerDef.position.Set(0, -10);
@@ -376,8 +376,10 @@ export let PlayState = (game, transition) => {
       shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
     },
     drawBoat() {
+      shapes.useMaterial(holoMaterial);
       shapes.drawColoredRect(colors.boatStake, -2.5, -.75, 2.5, .75);
       shapes.drawColoredTriangle(colors.boatStake, 3.5, -.75, 2.5, -.75, 2.5, .75);
+      shapes.useMaterial(shapesMaterial);
     },
     drawIsland() {
       shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
@@ -392,10 +394,10 @@ export let PlayState = (game, transition) => {
       shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
       shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
       
-//      shapes.useMaterial(holoMaterial);
+      shapes.useMaterial(holoMaterial);
       shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25);
       shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7);
-//      shapes.useMaterial(shapesMaterial);
+      shapes.useMaterial(shapesMaterial);
     },
     drawSun() {
       matStack.push(matrix);
