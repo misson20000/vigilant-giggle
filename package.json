@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "blob-util": "^1.2.1",
+    "box2d-html5": "^0.1.230",
     "matter-js": "^0.10.0"
   },
   "devDependencies": {

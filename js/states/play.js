@@ -2,7 +2,7 @@ import {AssetManager} from "../assetmgr.js";
 import {Colors, Color, ColorUtils} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {Keyboard} from "../keyboard.js";
-import * as Matter from "matter-js";
+import * as box2d from "box2d-html5";
 
 let colors = {
   bg: Color("#2698FC"),
@@ -82,16 +82,52 @@ export let PlayState = (game, transition) => {
     return a + x * (b-a);
   };
 
-  let physics = Matter.Engine.create();
-  let island = Matter.Bodies.rectangle(0, -20, 400, 60, {isStatic: true});
-  let player = Matter.Bodies.rectangle(0, -500, 50, 50);
-  Matter.World.add(physics.world, [island, player]);
-
+  let buoyancy = new box2d.b2BuoyancyController();
+  buoyancy.normal.Set(0, -1);
+  buoyancy.offset = 0;
+  buoyancy.density = 2;
+  buoyancy.linearDrag = 5;
+  buoyancy.angularDrag = 2;
+  
+  let world = new box2d.b2World(new box2d.b2Vec2(0, 15));
+  let islandDef = new box2d.b2BodyDef();
+  islandDef.position.Set(0, .25);
+  let island = world.CreateBody(islandDef);
+  let islandShape = new box2d.b2PolygonShape();
+  islandShape.SetAsBox(5, 1.5);
+  island.CreateFixture2(islandShape, 0.0);
+  islandShape.Set([
+    new box2d.b2Vec2(-5, -1.5),
+    new box2d.b2Vec2(-10, 0),
+    new box2d.b2Vec2(-5, 0)], 3);
+  island.CreateFixture2(islandShape, 0.0);
+  islandShape.Set([
+    new box2d.b2Vec2(5, -1.5),
+    new box2d.b2Vec2(10, 0),
+    new box2d.b2Vec2(5, 0)], 3);
+  island.CreateFixture2(islandShape, 0.0);
+  
+  let playerDef = new box2d.b2BodyDef();
+  playerDef.type = box2d.b2BodyType.b2_dynamicBody;
+  playerDef.position.Set(0, -10);
+  let playerBody = world.CreateBody(playerDef);
+  let playerBox = new box2d.b2PolygonShape();
+  playerBox.SetAsBox(1, 1);
+  let playerFixtureDef = new box2d.b2FixtureDef();
+  playerFixtureDef.shape = playerBox;
+  playerFixtureDef.density = 1;
+  playerFixtureDef.friction = 0.6;
+  playerBody.CreateFixture(playerFixtureDef);
+  buoyancy.AddBody(playerBody);
+  world.AddController(buoyancy);
+  
   let kb = Keyboard.create();
   let binds = {
     left: kb.createKeybind("ArrowLeft"),
     right: kb.createKeybind("ArrowRight")
   };
+
+  let b2timer = 0;
   
   let self = {
     initialize() {
@@ -128,7 +164,7 @@ export let PlayState = (game, transition) => {
       
       opMatrix.load.translate(render.width()/2, render.height(), 0);
       matrix.multiply(opMatrix);
-
+      
       self.starColor();
       for(let i = 0; i < stars.length; i++) {
         let star = stars[i];
@@ -138,13 +174,16 @@ export let PlayState = (game, transition) => {
                                (render.width() * star[0]) + 1.0 - render.width()/2,
                                (-render.height() * star[1]) + 1.0);
       }
+
+      opMatrix.load.scale(40, 40, 1); // 1 game unit = 40 pixels
+      matrix.multiply(opMatrix);
       
       self.drawIsland();
 
       matStack.push(matrix);
       opMatrix.load.rotate(self.dayCycle()*Math.PI*2);
       matrix.multiply(opMatrix);
-      opMatrix.load.translate(0, -450, 0);
+      opMatrix.load.translate(0, -11.25, 0);
       matrix.multiply(opMatrix);
       opMatrix.load.rotate(-self.dayCycle()*Math.PI*2);
       matrix.multiply(opMatrix);
@@ -154,63 +193,62 @@ export let PlayState = (game, transition) => {
       matStack.push(matrix);
       opMatrix.load.rotate(self.dayCycle()*Math.PI*2);
       matrix.multiply(opMatrix);
-      opMatrix.load.translate(0, 450, 0);
+      opMatrix.load.translate(0, 11.25, 0);
       matrix.multiply(opMatrix);
       opMatrix.load.rotate(-self.dayCycle()*Math.PI*2);
       matrix.multiply(opMatrix);
 
       let phase = self.moonPhase();
       if(phase < .25) {
-        self.drawArc(skyColor, 20, -3*Math.PI/2, -Math.PI/2);
-        self.drawArc(colors.moon, 20, -Math.PI/2, Math.PI/2);
+        self.drawArc(skyColor, .5, -3*Math.PI/2, -Math.PI/2);
+        self.drawArc(colors.moon, .5, -Math.PI/2, Math.PI/2);
         opMatrix.load.scale((.25-phase)*4, 1, 1);
         matrix.multiply(opMatrix);
-        self.drawArc(skyColor, 20, 0, Math.PI*2);
+        self.drawArc(skyColor, .5, 0, Math.PI*2);
       } else if(phase < .5) {
-        self.drawArc(skyColor, 20, -3*Math.PI/2, -Math.PI/2);
-        self.drawArc(colors.moon, 20, -Math.PI/2, Math.PI/2);
+        self.drawArc(skyColor, .5, -3*Math.PI/2, -Math.PI/2);
+        self.drawArc(colors.moon, .5, -Math.PI/2, Math.PI/2);
         opMatrix.load.scale((phase-.25)*4, 1, 1);
         matrix.multiply(opMatrix);
-        self.drawArc(colors.moon, 20, 0, Math.PI*2);
+        self.drawArc(colors.moon, .5, 0, Math.PI*2);
       } else if(phase < .75) {
         phase-= .5;
-        self.drawArc(colors.moon, 20, -3*Math.PI/2, -Math.PI/2);
-        self.drawArc(skyColor, 20, -Math.PI/2, Math.PI/2);
+        self.drawArc(colors.moon, .5, -3*Math.PI/2, -Math.PI/2);
+        self.drawArc(skyColor, .5, -Math.PI/2, Math.PI/2);
         opMatrix.load.scale((.75-phase-.5)*4, 1, 1);
         matrix.multiply(opMatrix);
-        self.drawArc(colors.moon, 20, 0, Math.PI*2);        
+        self.drawArc(colors.moon, .5, 0, Math.PI*2);        
       } else {
-        self.drawArc(colors.moon, 20, -3*Math.PI/2, -Math.PI/2);
-        self.drawArc(skyColor, 20, -Math.PI/2, Math.PI/2);
+        self.drawArc(colors.moon, .5, -3*Math.PI/2, -Math.PI/2);
+        self.drawArc(skyColor, .5, -Math.PI/2, Math.PI/2);
         opMatrix.load.scale((phase-.75)*4, 1, 1);
         matrix.multiply(opMatrix);
-        self.drawArc(skyColor, 20, 0, Math.PI*2);
+        self.drawArc(skyColor, .5, 0, Math.PI*2);
       }
-      matStack.pop(matrix);
+      matStack.pop(matrix); // pop moon matrix
 
-      matStack.push(matrix);
-      opMatrix.load.translate(player.position.x, player.position.y, 0);
+      opMatrix.load.translate(playerBody.GetPosition().x, playerBody.GetPosition().y, 0);
       matrix.multiply(opMatrix);
-      opMatrix.load.rotate(player.angle);
+      console.log(playerBody.GetPosition().x + ", " + playerBody.GetPosition().y);
+      opMatrix.load.rotate(playerBody.GetAngleRadians());
       matrix.multiply(opMatrix);
-      shapes.drawColoredRect(colors.player, -25, -25, 25, 25);
-      matStack.pop(matrix);
+      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
       
       matStack.pop(matrix);
     },
     drawIsland() {
-      shapes.drawColoredRect(colors.dirt, -200, -50, 200, 10);
-      shapes.drawColoredTriangle(colors.grass, -200, -50, -400, 10, -200, 10);
-      shapes.drawColoredTriangle(colors.dirt, -200, -40, -400, 20, -200, 20);
-      shapes.drawColoredTriangle(colors.grass, 200, -50, 400, 10, 200, 10);
-      shapes.drawColoredTriangle(colors.dirt, 200, -40, 400, 20, 200, 20);
-      shapes.drawColoredRect(colors.grass, -200, -50, 200, -40);
+      shapes.drawColoredRect(colors.dirt, -5, -1.25, 5, .25);
+      shapes.drawColoredTriangle(colors.grass, -5, -1.25, -10, .25, -5, .25);
+      shapes.drawColoredTriangle(colors.dirt, -5, -1, -10, .5, -5, .5);
+      shapes.drawColoredTriangle(colors.grass, 5, -1.25, 10, .25, 5, .25);
+      shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
+      shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
     },
     drawSun() {
       matStack.push(matrix);
       let segments = 3;
       for(let i = 0; i < segments; i++) {
-        shapes.drawColoredRect(colors.sun, -30, -30, 30, 30);
+        shapes.drawColoredRect(colors.sun, -.75, -.75, .75, .75);
         opMatrix.load.rotate(Math.PI/(2*segments));
         matrix.multiply(opMatrix);
       }
@@ -234,18 +272,18 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix);
     },
     tick(delta) {
-      let physdelta = delta;
-      while(physdelta > 0) {
-        Matter.Engine.update(physics, Math.min(physdelta, 20));
-        physdelta-= 20;
+      b2timer+= delta;
+      while(b2timer > 5) {
+        world.Step(5.0 / 1000.0, 8, 3);
+        b2timer-= 5;
       }
 
       if(binds.right.isPressed()) {
-        Matter.Body.setAngularVelocity(player, 0.07);
+        playerBody.SetAngularVelocity(2);
       }
 
       if(binds.left.isPressed()) {
-        Matter.Body.setAngularVelocity(player, -0.07);
+        playerBody.SetAngularVelocity(-2);
       }
       
       matStack.reset();
