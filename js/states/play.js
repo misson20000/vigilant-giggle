@@ -2,6 +2,7 @@ import {AssetManager} from "../assetmgr.js";
 import {Colors, Color, ColorUtils} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {Keyboard} from "../keyboard.js";
+import * as Matter from "matter-js";
 
 let colors = {
   bg: Color("#2698FC"),
@@ -11,6 +12,7 @@ let colors = {
   grass: Color("#45A81E"),
   sun: Color(1, 1, 0, 1),
   moon: Color(0.8, 0.8, 0.8, 1),
+  player: Color(0.8, 0.8, 0.8, 1),
   water: ColorUtils.multRGB(Color(0.8, 0.8, 1, 1), 0.2),
   stars: ColorUtils.multRGB(Color(1, 0.8, 0.8, 1), 1)
 };
@@ -65,7 +67,7 @@ export let PlayState = (game, transition) => {
 
   let camera = {
     x: 0,
-    y: 0
+    y: -300
   };
 
   let skyColor = Color(0, 0, 0, 1);
@@ -79,12 +81,23 @@ export let PlayState = (game, transition) => {
   let lerp = (a, b, x) => {
     return a + x * (b-a);
   };
+
+  let physics = Matter.Engine.create();
+  let island = Matter.Bodies.rectangle(0, -20, 400, 60, {isStatic: true});
+  let player = Matter.Bodies.rectangle(0, -500, 50, 50);
+  Matter.World.add(physics.world, [island, player]);
+
+  let kb = Keyboard.create();
+  let binds = {
+    left: kb.createKeybind("ArrowLeft"),
+    right: kb.createKeybind("ArrowRight")
+  };
   
   let self = {
     initialize() {
     },
     dayCycle() {
-      return time / 7000.0;
+      return time / 180000.0;
     },
     moonPhase() {
       return (self.dayCycle() / 29.530588853) % 1;
@@ -174,6 +187,14 @@ export let PlayState = (game, transition) => {
         self.drawArc(skyColor, 20, 0, Math.PI*2);
       }
       matStack.pop(matrix);
+
+      matStack.push(matrix);
+      opMatrix.load.translate(player.position.x, player.position.y, 0);
+      matrix.multiply(opMatrix);
+      opMatrix.load.rotate(player.angle);
+      matrix.multiply(opMatrix);
+      shapes.drawColoredRect(colors.player, -25, -25, 25, 25);
+      matStack.pop(matrix);
       
       matStack.pop(matrix);
     },
@@ -212,11 +233,21 @@ export let PlayState = (game, transition) => {
       }
       matStack.pop(matrix);
     },
-    reflect(y, matrix) {
-      opMatrix.load.translate(0, y*2, 0); matrix.multiply(opMatrix);
-      opMatrix.load.scale(1, -1, 1); matrix.multiply(opMatrix);
-    },
     tick(delta) {
+      let physdelta = delta;
+      while(physdelta > 0) {
+        Matter.Engine.update(physics, Math.min(physdelta, 20));
+        physdelta-= 20;
+      }
+
+      if(binds.right.isPressed()) {
+        Matter.Body.setAngularVelocity(player, 0.07);
+      }
+
+      if(binds.left.isPressed()) {
+        Matter.Body.setAngularVelocity(player, -0.07);
+      }
+      
       matStack.reset();
       matrix.load.identity();
 
@@ -224,36 +255,31 @@ export let PlayState = (game, transition) => {
       shapes.useMaterial(shapesMaterial);
 
       fb.bind();
+      opMatrix.load.translate(-camera.x, 0, 0);
+      matrix.multiply(opMatrix);
       self.drawScene();
       shapes.flush();
       fb.unbind();
       
-      opMatrix.load.translate(0, -render.height()/2, 0);
+      opMatrix.load.translate(0, -render.height()/2-camera.y, 0);
       matrix.multiply(opMatrix);
       self.drawScene();
       shapes.flush();
 
-//      render.setStencil(true);
-      render.drawStencil();
-      matStack.push(matrix);
-      opMatrix.load.translate(render.width()/2, render.height()/2, 0);
-      matrix.multiply(opMatrix);
-      shapes.drawColoredRect(Colors.WHITE, -render.width(), 75, render.width(), render.height());
-      shapes.flush();
-      render.drawColor();
-      
       postMatrix.load.from(render.pixelMatrix);
-      opMatrix.load.translate(0, render.height() + render.height()/2, 0);
+      opMatrix.load.translate(0, render.height() + render.height()/2 - camera.y, 0);
       postMatrix.multiply(opMatrix);
       opMatrix.load.scale(1, -1, 1);
       postMatrix.multiply(opMatrix);
       
       post.drawQuad(fb.getAttributes());
       post.flush();
-      render.setStencil(false);
       
       transition.draw(delta);
       time+= delta;
+    },
+    getKeyboard() {
+      return kb;
     }
   };
   return self;

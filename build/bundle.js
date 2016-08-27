@@ -52,7 +52,7 @@
 	
 	var _assetmgr = __webpack_require__(7);
 	
-	var _sound = __webpack_require__(22);
+	var _sound = __webpack_require__(15);
 	
 	var game = {};
 	window.theGame = game;
@@ -2067,7 +2067,7 @@
 	
 	var _transitions = __webpack_require__(12);
 	
-	var _menu = __webpack_require__(13);
+	var _play = __webpack_require__(13);
 	
 	var LoaderState = exports.LoaderState = function LoaderState(game) {
 	  var render = game.render;
@@ -2093,13 +2093,14 @@
 	
 	  return {
 	    initialize: function initialize() {
-	      Promise.all([_assetmgr.AssetManager.downloadAssetGroup("sfxtest"), _assetmgr.AssetManager.downloadAssetGroup("mustest"), _assetmgr.AssetManager.downloadAssetGroup("posttest"), _assetmgr.AssetManager.downloadAssetGroup("posttest2")]).then(function () {
-	        transition.to((0, _menu.MenuState)(game, transition), 500, 100);
+	      Promise.all([_assetmgr.AssetManager.downloadAssetGroup("game")]).then(function () {
+	        transition.to((0, _play.PlayState)(game, transition), 500, 100);
 	      }, function (err) {
 	        console.log("failed to load assets: " + err);
 	        errored = true;
 	        error = err;
 	      });
+	      transition.to((0, _play.PlayState)(game, transition), 500, 100);
 	    },
 	    tick: function tick(delta) {
 	      render.clear(backgroundColor);
@@ -2246,7 +2247,7 @@
 	Object.defineProperty(exports, "__esModule", {
 	  value: true
 	});
-	exports.MenuState = undefined;
+	exports.PlayState = undefined;
 	
 	var _assetmgr = __webpack_require__(7);
 	
@@ -2256,174 +2257,251 @@
 	
 	var _keyboard = __webpack_require__(14);
 	
-	var _keyboard2 = __webpack_require__(15);
+	var colors = {
+	  bg: (0, _gfxutils.Color)("#2698FC"),
+	  cloud: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
+	  fg: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
+	  dirt: (0, _gfxutils.Color)("#5E3F1B"),
+	  grass: (0, _gfxutils.Color)("#45A81E"),
+	  sun: (0, _gfxutils.Color)(1, 1, 0, 1),
+	  moon: (0, _gfxutils.Color)(0.8, 0.8, 0.8, 1),
+	  water: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(0.8, 0.8, 1, 1), 0.2),
+	  stars: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(1, 0.8, 0.8, 1), 1)
+	};
 	
-	var _sound = __webpack_require__(16);
+	var Cloud = function Cloud() {
+	  var w = 125;
+	  var h = 65;
 	
-	var _music = __webpack_require__(17);
+	  var self = {
+	    draw: function draw(shapes) {
+	      shapes.drawColoredRect(colors.cloud, -w / 2, -h / 2, w / 2, h / 2);
+	      var x = -w / 2;
+	      for (var i = 0; i < rects.length; i++) {
+	        shapes.drawColoredRect(colors.cloud, x - rects[i] / 2, -(h / 2) - rects[i] / 2, x + rects[i] / 2, -(h / 2) + rects[i] / 2);
+	        x += rects[i];
+	      }
+	    }
+	  };
+	  return self;
+	};
 	
-	var _stencil = __webpack_require__(18);
-	
-	var _post = __webpack_require__(19);
-	
-	var _post2 = __webpack_require__(20);
-	
-	var _about = __webpack_require__(21);
-	
-	var MenuState = exports.MenuState = function MenuState(game, transition) {
+	var PlayState = exports.PlayState = function PlayState(game, transition) {
 	  var render = game.render;
-	  var color = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
+	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
 	    matrix: render.pixelMatrix
 	  });
 	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var rects = render.createShapeDrawer();
+	  var fb = render.createFramebuffer(100); // 100 pixels of padding
+	  var _time = 0;
+	  var postMatrix = _math.Mat4.create();
+	  var post = render.createMaterial(_assetmgr.AssetManager.getAsset("game.shader.reflection"), {
+	    framebuffer: fb.getTexture(),
+	    perlin: _assetmgr.AssetManager.getAsset("game.noise.perlin"),
+	    matrix: postMatrix,
+	    time: function time() {
+	      return _time;
+	    },
+	    pixwidth: render.fbwidth,
+	    pixheight: render.fbheight,
+	    refY: function refY() {
+	      return fb.ytoc(0);
+	    }
+	  });
+	  var shapes = render.createShapeDrawer();
+	
 	  var opMatrix = _math.Mat4.create();
 	  var matStack = _math.Mat4Stack.create();
 	  var matrix = _math.Mat4.create();
-	  var time = 0;
-	  var unifTimer = 0;
 	
-	  var gridA = (0, _gfxutils.Color)(0.020, 0.020, 0.020, 1);
-	  var gridB = (0, _gfxutils.Color)(0.030, 0.030, 0.030, 1);
+	  var cloud = Cloud();
 	
-	  var shake = 0;
-	  var tests = void 0;
-	  var selectedTest = 0;
+	  var camera = {
+	    x: 0,
+	    y: 0
+	  };
 	
-	  var kb = _keyboard.Keyboard.create();
-	  var up = kb.createKeybind("ArrowUp", "w");
-	  var down = kb.createKeybind("ArrowDown", "s");
-	  var select = kb.createKeybind("Enter", "z", "Return");
+	  var _skyColor = (0, _gfxutils.Color)(0, 0, 0, 1);
+	  var _starColor = (0, _gfxutils.Color)(0, 0, 0, 1);
 	
-	  var selected = false;
+	  var stars = [];
+	  for (var i = 0; i < 1000; i++) {
+	    stars.push([Math.random(), Math.random()]);
+	  }
+	
+	  var lerp = function lerp(a, b, x) {
+	    return a + x * (b - a);
+	  };
 	
 	  var self = {
-	    initialize: function initialize() {
-	      selected = false;
-	      tests = [{
-	        name: "Me & My Tools",
-	        state: (0, _about.AboutState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Keyboard Test",
-	        state: (0, _keyboard2.KeyboardTestState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Sound Test",
-	        state: (0, _sound.SoundTestState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Music Test",
-	        state: (0, _music.MusicTestState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Stencil Test",
-	        state: (0, _stencil.StencilTestState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Post-Processing Test",
-	        state: (0, _post.PostProcessingTestState)(game, self, transition),
-	        anim: 0
-	      }, {
-	        name: "Post-Processing Test 2",
-	        state: (0, _post2.PostProcessingTest2State)(game, self, transition),
-	        anim: 0
-	      }];
+	    initialize: function initialize() {},
+	    dayCycle: function dayCycle() {
+	      return _time / 7000.0;
 	    },
-	    uniformTick: function uniformTick() {
-	      shake = shake * 0.95;
-	
-	      for (var i = 0; i < tests.length; i++) {
-	        if (i != selectedTest) {
-	          tests[i].anim *= 0.90;
-	        }
-	      }
+	    moonPhase: function moonPhase() {
+	      return self.dayCycle() / 29.530588853 % 1;
 	    },
-	    tick: function tick(delta) {
-	      render.clear(_gfxutils.Colors.BLACK);
-	
-	      if (down.justPressed()) {
-	        selectedTest++;
-	        if (selectedTest >= tests.length) {
-	          selectedTest = 0;
-	        }
-	      }
-	
-	      if (up.justPressed()) {
-	        selectedTest--;
-	        if (selectedTest < 0) {
-	          selectedTest = tests.length - 1;
-	        }
-	      }
-	
-	      if (select.justPressed()) {
-	        if (selected === false) {
-	          selected = selectedTest;
-	          transition.to(tests[selected].state, 750, 500);
-	        }
-	      }
-	
-	      matStack.reset();
-	      matrix.load.identity();
+	    skyColor: function skyColor() {
+	      var fac = Math.sin((self.dayCycle() + 0.25) * Math.PI * 2) / 2 + 0.5;
+	      fac += 0.1;
+	      fac = Math.min(fac, 1);
+	      _skyColor.r = colors.bg.r * fac;
+	      _skyColor.g = colors.bg.g * fac;
+	      _skyColor.b = colors.bg.b * fac;
+	      return _skyColor;
+	    },
+	    starColor: function starColor() {
+	      var fac = Math.sin((self.dayCycle() + 0.25) * Math.PI * 2) / 2 + 0.5;
+	      fac = 1 - fac; // 1 at night
+	      fac -= 0.5;
+	      fac *= 2;
+	      fac = Math.max(0, fac);
+	      _starColor.r = lerp(_skyColor.r, colors.stars.r, fac);
+	      _starColor.g = lerp(_skyColor.g, colors.stars.g, fac);
+	      _starColor.b = lerp(_skyColor.b, colors.stars.b, fac);
+	      //starColor = colors.stars;
+	    },
+	    drawScene: function drawScene() {
+	      render.clear(self.skyColor());
 	      matStack.push(matrix);
 	
-	      opMatrix.load.translate((Math.random() * 2 - 1) * shake, (Math.random() * 2 - 1) * shake, 0);
+	      opMatrix.load.translate(render.width() / 2, render.height(), 0);
 	      matrix.multiply(opMatrix);
-	      matStack.push(matrix);
 	
-	      rects.useMatrix(matrix);
-	      rects.useMaterial(color);
-	      for (var x = 0; x < render.width(); x += 20) {
-	        for (var y = 0; y < render.height(); y += 20) {
-	          rects.drawColoredRect((x + y) % 40 == 0 ? gridA : gridB, x, y, x + 20, y + 20);
-	        }
+	      self.starColor();
+	      for (var _i = 0; _i < stars.length; _i++) {
+	        var star = stars[_i];
+	        shapes.drawColoredRect(_starColor, render.width() * star[0] - 1.0 - render.width() / 2, -render.height() * star[1] - 1.0, render.width() * star[0] + 1.0 - render.width() / 2, -render.height() * star[1] + 1.0);
 	      }
-	      rects.flush();
 	
-	      matStack.peek(matrix);
-	      opMatrix.load.translate(render.width() / 2, render.height() / 2, 0);
-	      matrix.multiply(opMatrix);
+	      self.drawIsland();
+	
 	      matStack.push(matrix);
-	
-	      opMatrix.load.translate(0, -150, 0);
+	      opMatrix.load.rotate(self.dayCycle() * Math.PI * 2);
 	      matrix.multiply(opMatrix);
-	
-	      opMatrix.load.rotate(Math.sin(time / 150.0) / 6);
+	      opMatrix.load.translate(0, -450, 0);
 	      matrix.multiply(opMatrix);
-	
-	      font.useMatrix(matrix);
-	      font.drawCentered(_gfxutils.Colors.WHITE, 0, -font.height / 2, "LD36 Engine Test");
-	      font.flush();
-	
+	      opMatrix.load.rotate(-self.dayCycle() * Math.PI * 2);
+	      matrix.multiply(opMatrix);
+	      self.drawSun();
 	      matStack.pop(matrix);
 	
-	      for (var i = 0; i < tests.length; i++) {
-	        var test = tests[i];
-	        if (i == selectedTest) {
-	          test.anim = 1;
-	        }
-	        matStack.push(matrix);
-	        opMatrix.load.scale((Math.sin(time / 150.0) + 4) / 10 * test.anim + 1, (Math.sin(time / 150.0) + 4) / 10 * test.anim + 1, (Math.sin(time / 150.0) + 4) / 10 * test.anim + 1);
+	      matStack.push(matrix);
+	      opMatrix.load.rotate(self.dayCycle() * Math.PI * 2);
+	      matrix.multiply(opMatrix);
+	      opMatrix.load.translate(0, 450, 0);
+	      matrix.multiply(opMatrix);
+	      opMatrix.load.rotate(-self.dayCycle() * Math.PI * 2);
+	      matrix.multiply(opMatrix);
+	
+	      var phase = self.moonPhase();
+	      if (phase < .25) {
+	        self.drawArc(_skyColor, 20, -3 * Math.PI / 2, -Math.PI / 2);
+	        self.drawArc(colors.moon, 20, -Math.PI / 2, Math.PI / 2);
+	        opMatrix.load.scale((.25 - phase) * 4, 1, 1);
 	        matrix.multiply(opMatrix);
+	        self.drawArc(_skyColor, 20, 0, Math.PI * 2);
+	      } else if (phase < .5) {
+	        self.drawArc(_skyColor, 20, -3 * Math.PI / 2, -Math.PI / 2);
+	        self.drawArc(colors.moon, 20, -Math.PI / 2, Math.PI / 2);
+	        opMatrix.load.scale((phase - .25) * 4, 1, 1);
+	        matrix.multiply(opMatrix);
+	        self.drawArc(colors.moon, 20, 0, Math.PI * 2);
+	      } else if (phase < .75) {
+	        phase -= .5;
+	        self.drawArc(colors.moon, 20, -3 * Math.PI / 2, -Math.PI / 2);
+	        self.drawArc(_skyColor, 20, -Math.PI / 2, Math.PI / 2);
+	        opMatrix.load.scale((.75 - phase - .5) * 4, 1, 1);
+	        matrix.multiply(opMatrix);
+	        self.drawArc(colors.moon, 20, 0, Math.PI * 2);
+	      } else {
+	        self.drawArc(colors.moon, 20, -3 * Math.PI / 2, -Math.PI / 2);
+	        self.drawArc(_skyColor, 20, -Math.PI / 2, Math.PI / 2);
+	        opMatrix.load.scale((phase - .75) * 4, 1, 1);
+	        matrix.multiply(opMatrix);
+	        self.drawArc(_skyColor, 20, 0, Math.PI * 2);
+	      }
+	      matStack.pop(matrix);
 	
-	        font.drawCentered(_gfxutils.Colors.WHITE, 0, -font.height / 2, tests[i].name);
-	
-	        matStack.pop(matrix);
-	
-	        opMatrix.load.translate(0, font.height, 0);
+	      matStack.pop(matrix);
+	    },
+	    drawIsland: function drawIsland() {
+	      shapes.drawColoredRect(colors.dirt, -200, -50, 200, 10);
+	      shapes.drawColoredTriangle(colors.grass, -200, -50, -400, 10, -200, 10);
+	      shapes.drawColoredTriangle(colors.dirt, -200, -40, -400, 20, -200, 20);
+	      shapes.drawColoredTriangle(colors.grass, 200, -50, 400, 10, 200, 10);
+	      shapes.drawColoredTriangle(colors.dirt, 200, -40, 400, 20, 200, 20);
+	      shapes.drawColoredRect(colors.grass, -200, -50, 200, -40);
+	    },
+	    drawSun: function drawSun() {
+	      matStack.push(matrix);
+	      var segments = 3;
+	      for (var _i2 = 0; _i2 < segments; _i2++) {
+	        shapes.drawColoredRect(colors.sun, -30, -30, 30, 30);
+	        opMatrix.load.rotate(Math.PI / (2 * segments));
 	        matrix.multiply(opMatrix);
 	      }
+	      matStack.pop(matrix);
+	    },
+	    drawArc: function drawArc(color, rad, beg, end) {
+	      matStack.push(matrix);
+	      var segments = 40.0;
+	      var x = rad * Math.cos(beg);
+	      var y = rad * Math.sin(beg);
+	      for (var angle = beg; angle <= end; angle += Math.PI / 20.0) {
+	        if (angle > end) {
+	          angle = end;
+	        }
+	        var x2 = rad * Math.cos(angle);
+	        var y2 = rad * Math.sin(angle);
+	        shapes.drawColoredTriangle(color, x, y, 0, 0, x2, y2);
+	        x = x2;
+	        y = y2;
+	      }
+	      matStack.pop(matrix);
+	    },
+	    reflect: function reflect(y, matrix) {
+	      opMatrix.load.translate(0, y * 2, 0);matrix.multiply(opMatrix);
+	      opMatrix.load.scale(1, -1, 1);matrix.multiply(opMatrix);
+	    },
+	    tick: function tick(delta) {
+	      matStack.reset();
+	      matrix.load.identity();
+	
+	      shapes.useMatrix(matrix);
+	      shapes.useMaterial(shapesMaterial);
+	
+	      fb.bind();
+	      self.drawScene();
+	      shapes.flush();
+	      fb.unbind();
+	
+	      opMatrix.load.translate(0, -render.height() / 2, 0);
+	      matrix.multiply(opMatrix);
+	      self.drawScene();
+	      shapes.flush();
+	
+	      //      render.setStencil(true);
+	      render.drawStencil();
+	      matStack.push(matrix);
+	      opMatrix.load.translate(render.width() / 2, render.height() / 2, 0);
+	      matrix.multiply(opMatrix);
+	      shapes.drawColoredRect(_gfxutils.Colors.WHITE, -render.width(), 75, render.width(), render.height());
+	      shapes.flush();
+	      render.drawColor();
+	
+	      postMatrix.load.from(render.pixelMatrix);
+	      opMatrix.load.translate(0, render.height() + render.height() / 2, 0);
+	      postMatrix.multiply(opMatrix);
+	      opMatrix.load.scale(1, -1, 1);
+	      postMatrix.multiply(opMatrix);
+	
+	      post.drawQuad(fb.getAttributes());
+	      post.flush();
+	      render.setStencil(false);
 	
 	      transition.draw(delta);
-	      time += delta;
-	      unifTimer += delta;
-	      while (unifTimer > 10) {
-	        unifTimer -= 10;
-	        self.uniformTick();
-	      }
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
+	      _time += delta;
 	    }
 	  };
 	  return self;
@@ -2527,754 +2605,6 @@
 
 /***/ },
 /* 15 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.KeyboardTestState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1),
-	  arrowOutline: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
-	  pressed: (0, _gfxutils.Color)(1, 1, 1, 1),
-	  debug: _gfxutils.Colors.RED
-	};
-	
-	var KeyboardTestState = exports.KeyboardTestState = function KeyboardTestState(game, menu, transition) {
-	  var render = game.render;
-	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
-	    matrix: render.pixelMatrix
-	  });
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var shapes = render.createShapeDrawer();
-	
-	  var opMatrix = _math.Mat4.create();
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	  var time = 0;
-	  var unifTimer = 0;
-	  var shake = 0;
-	  var kb = _keyboard.Keyboard.create();
-	
-	  var binds = [kb.createKeybind("ArrowLeft", "a"), kb.createKeybind("ArrowUp", "w"), kb.createKeybind("ArrowDown", "s"), kb.createKeybind("ArrowRight", "d")];
-	
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  for (var i = 0; i < binds.length; i++) {
-	    binds[i].addPressCallback(function () {
-	      shake = 10;
-	    });
-	  }
-	
-	  var self = {
-	    drawLeftArrow: function drawLeftArrow(hollow) {
-	      matStack.push(matrix);
-	      opMatrix.load.rotate(-Math.PI / 2);
-	      matrix.multiply(opMatrix);
-	      self.drawUpArrow(hollow);
-	      matStack.pop(matrix);
-	    },
-	    drawUpArrow: function drawUpArrow(hollow) {
-	      shapes.drawColoredRect(colors.arrowOutline, -10, -10, 10, 20);
-	      shapes.drawColoredTriangle(colors.arrowOutline, -20, 0, 0, -20, 20, 0);
-	
-	      if (hollow) {
-	        shapes.drawColoredRect(hollow, -8, -2, 8, 18);
-	        shapes.drawColoredTriangle(hollow, -16, -2, 0, -16, 16, -2);
-	      }
-	    },
-	    drawDownArrow: function drawDownArrow(hollow) {
-	      matStack.push(matrix);
-	      opMatrix.load.rotate(Math.PI);
-	      matrix.multiply(opMatrix);
-	      self.drawUpArrow(hollow);
-	      matStack.pop(matrix);
-	    },
-	    drawRightArrow: function drawRightArrow(hollow) {
-	      matStack.push(matrix);
-	      opMatrix.load.rotate(Math.PI / 2);
-	      matrix.multiply(opMatrix);
-	      self.drawUpArrow(hollow);
-	      matStack.pop(matrix);
-	    },
-	    uniformTick: function uniformTick() {
-	      shake *= 0.95;
-	    },
-	    tick: function tick(delta) {
-	      render.clear(colors.bg);
-	
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      shapes.useMatrix(matrix);
-	      shapes.useMaterial(shapesMaterial);
-	
-	      opMatrix.load.translate(render.width() / 2, render.height() / 2, 0);
-	      matrix.multiply(opMatrix);
-	      matStack.push(matrix);
-	
-	      opMatrix.load.translate((Math.random() * 2 - 1) * shake, (Math.random() * 2 - 1) * shake, 0);
-	      matrix.multiply(opMatrix);
-	      matStack.push(matrix);
-	
-	      opMatrix.load.translate(-75, 0, 0);
-	      matrix.multiply(opMatrix);
-	
-	      var symbols = [self.drawLeftArrow, self.drawUpArrow, self.drawDownArrow, self.drawRightArrow];
-	      for (var _i = 0; _i < symbols.length; _i++) {
-	        symbols[_i](binds[_i].isPressed() ? colors.pressed : colors.bg);
-	
-	        opMatrix.load.translate(50, 0, 0);
-	        matrix.multiply(opMatrix);
-	      }
-	
-	      unifTimer += delta;
-	      while (unifTimer > 10) {
-	        unifTimer -= 10;
-	        self.uniformTick();
-	      }
-	
-	      shapes.flush();
-	
-	      matrix.load.identity();
-	      font.useMatrix(matrix);
-	      font.draw(_gfxutils.Colors.WHITE, 0, render.height() - font.height, "Press Escape to go back");
-	      font.flush();
-	
-	      transition.draw(delta);
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	
-	  return self;
-	};
-
-/***/ },
-/* 16 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.SoundTestState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1)
-	};
-	
-	var SoundTestState = exports.SoundTestState = function SoundTestState(game, menu, transition) {
-	  var render = game.render;
-	  var sfx = game.sound;
-	
-	  var soundMap = {
-	    "a": "sfxtest.krab",
-	    "s": "sfxtest.krabs",
-	    "d": "sfxtest.mr",
-	    "f": "sfxtest.oh",
-	    "g": "sfxtest.yeah"
-	  };
-	
-	  var kb = _keyboard.Keyboard.create();
-	
-	  var _loop = function _loop(key) {
-	    var asset = _assetmgr.AssetManager.getAsset(soundMap[key]);
-	
-	    kb.createKeybind(key).addPressCallback(function () {
-	      sfx.playSound(asset);
-	    });
-	  };
-	
-	  for (var key in soundMap) {
-	    _loop(key);
-	  }
-	
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	  var opMatrix = _math.Mat4.create();
-	
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  var self = {
-	    initialize: function initialize() {},
-	    tick: function tick(delta) {
-	      render.clear(colors.bg);
-	
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      font.useMatrix(matrix);
-	      font.draw(_gfxutils.Colors.WHITE, 0, render.height() - font.height, "Press Escape to go back");
-	      font.draw(_gfxutils.Colors.WHITE, 0, 0, "Try ASDFG. Be careful, though, because it's loud!");
-	      font.flush();
-	
-	      transition.draw(delta);
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	
-	  return self;
-	};
-
-/***/ },
-/* 17 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.MusicTestState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1),
-	  point: (0, _gfxutils.Color)(0.8, 0.8, 1, 1)
-	};
-	
-	var MusicTestState = exports.MusicTestState = function MusicTestState(game, menu, transition) {
-	  var render = game.render;
-	  var sfx = game.sound;
-	
-	  var color = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
-	    matrix: render.pixelMatrix
-	  });
-	  var shapes = render.createShapeDrawer();
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.coders_crux"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var bigfont = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	  var opMatrix = _math.Mat4.create();
-	
-	  var points = {
-	    harmony: [50, 50],
-	    bass: [600, 60],
-	    ride: [300, 300],
-	    beat: [50, 600],
-	    melody: [600, 600],
-	    arpeggio: [300, 50]
-	  };
-	
-	  var music = void 0;
-	
-	  var kb = _keyboard.Keyboard.create();
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  var self = {
-	    initialize: function initialize() {
-	      music = sfx.playMusic(_assetmgr.AssetManager.getAsset("mustest.music"));
-	    },
-	    tick: function tick(delta) {
-	      render.clear(colors.bg);
-	
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      font.useMatrix(matrix);
-	      shapes.useMatrix(matrix);
-	      shapes.useMaterial(color);
-	      for (var name in points) {
-	        var pt = points[name];
-	
-	        shapes.drawColoredRect(colors.point, pt[0] - 5, pt[1] - 5, pt[0] + 5, pt[1] + 5);
-	        font.draw(colors.point, pt[0] + 7, pt[1] - font.height - 7, name);
-	
-	        music.setTrackVolume(name, 1 - Math.min(Math.max(Math.sqrt(Math.pow(game.mouse.x - pt[0], 2) + Math.pow(game.mouse.y - pt[1], 2)) / 700.0, 0), 1));
-	      }
-	
-	      font.draw(colors.point, 0, 0, "(" + game.mouse.x + ", " + game.mouse.y + ")");
-	
-	      shapes.flush();
-	      font.flush();
-	
-	      bigfont.useMatrix(matrix);
-	      bigfont.draw(_gfxutils.Colors.WHITE, 0, render.height() - bigfont.height, "Press Escape to go back");
-	      bigfont.flush();
-	
-	      music.update();
-	
-	      transition.draw(delta);
-	    },
-	    destroy: function destroy() {
-	      music.stop();
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	
-	  return self;
-	};
-
-/***/ },
-/* 18 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.StencilTestState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1),
-	  fg: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
-	  water: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(0.8, 0.8, 1, 1), 0.2),
-	  stars: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(1, 0.8, 0.8, 1), 0.2)
-	};
-	
-	var StencilTestState = exports.StencilTestState = function StencilTestState(game, menu, transition) {
-	  var render = game.render;
-	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
-	    matrix: render.pixelMatrix
-	  });
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var shapes = render.createShapeDrawer();
-	
-	  var opMatrix = _math.Mat4.create();
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	
-	  var kb = _keyboard.Keyboard.create();
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  var stars = [];
-	  for (var i = 0; i < 1000; i++) {
-	    stars.push([Math.random(), Math.random()]);
-	  }
-	
-	  var self = {
-	    initialize: function initialize() {},
-	    drawScene: function drawScene() {
-	      for (var _i = 0; _i < stars.length; _i++) {
-	        var star = stars[_i];
-	        shapes.drawColoredRect(colors.stars, render.width() * star[0] - 1.0, render.height() * star[1] - 1.0, render.width() * star[0] + 1.0, render.height() * star[1] + 1.0);
-	      }
-	
-	      shapes.drawColoredRect(colors.fg, 0, render.height() / 2, render.width() / 2 - 100, render.height());
-	      shapes.drawColoredRect(colors.fg, render.width() / 2 + 100, render.height() / 2, render.width(), render.height());
-	      shapes.drawColoredRect(colors.fg, game.mouse.x - 5, game.mouse.y - 5, game.mouse.x + 5, game.mouse.y + 5);
-	    },
-	    reflect: function reflect(y) {
-	      opMatrix.load.translate(0, y * 2, 0);matrix.multiply(opMatrix);
-	      opMatrix.load.scale(1, -1, 1);matrix.multiply(opMatrix);
-	    },
-	    tick: function tick(delta) {
-	      render.clear(colors.bg);
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      shapes.useMatrix(matrix);
-	      shapes.useMaterial(shapesMaterial);
-	
-	      self.drawScene();
-	      shapes.flush();
-	
-	      render.setStencil(true);
-	      render.drawStencil();
-	      shapes.drawColoredRect(_gfxutils.Colors.WHITE, 0, render.height() / 2 + 100, render.width(), render.height()); // really doesn't matter what color, cause we can't see this
-	      shapes.flush();
-	      render.drawColor();
-	
-	      self.reflect(render.height() / 2 + 100);
-	      shapes.drawColoredRect(colors.bg, 0, 0, render.width(), render.height()); //clear
-	      self.drawScene();
-	      shapes.flush();
-	      render.setStencil(false);
-	
-	      matStack.pop(matrix);
-	      font.useMatrix(matrix);
-	      font.draw(_gfxutils.Colors.WHITE, 0, render.height() - font.height, "Press Escape to go back");
-	      font.flush();
-	
-	      transition.draw(delta);
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	  return self;
-	};
-
-/***/ },
-/* 19 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.PostProcessingTestState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1),
-	  fg: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
-	  water: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(0.8, 0.8, 1, 1), 0.2),
-	  stars: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(1, 0.8, 0.8, 1), 0.2)
-	};
-	
-	var PostProcessingTestState = exports.PostProcessingTestState = function PostProcessingTestState(game, menu, transition) {
-	  var render = game.render;
-	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
-	    matrix: render.pixelMatrix
-	  });
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var fb = render.createFramebuffer(100); // 100 pixels of padding
-	  var _time = 0;
-	  var _rippleX = 0;
-	  var _rippleY = 0;
-	  var post = render.createMaterial(_assetmgr.AssetManager.getAsset("posttest.shader"), {
-	    framebuffer: fb.getTexture(),
-	    matrix: render.pixelMatrix,
-	    time: function time() {
-	      return _time;
-	    },
-	    pixwidth: function pixwidth() {
-	      return render.fbwidth();
-	    },
-	    pixheight: function pixheight() {
-	      return render.fbheight();
-	    },
-	    rippleX: function rippleX() {
-	      return _rippleX;
-	    },
-	    rippleY: function rippleY() {
-	      return _rippleY;
-	    }
-	  });
-	  var shapes = render.createShapeDrawer();
-	
-	  var opMatrix = _math.Mat4.create();
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	
-	  var kb = _keyboard.Keyboard.create();
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	  kb.createKeybind("z").addPressCallback(function () {
-	    _time = 0;
-	    _rippleX = fb.xtoc(game.mouse.x);
-	    _rippleY = fb.ytoc(game.mouse.y);
-	  });
-	
-	  var stars = [];
-	  for (var i = 0; i < 1000; i++) {
-	    stars.push([Math.random(), Math.random()]);
-	  }
-	
-	  var self = {
-	    initialize: function initialize() {},
-	    drawScene: function drawScene() {
-	      for (var _i = 0; _i < stars.length; _i++) {
-	        var star = stars[_i];
-	        shapes.drawColoredRect(colors.stars, render.fbwidth() * star[0] - 1.0, render.fbheight() * star[1] - 1.0, render.fbwidth() * star[0] + 1.0, render.fbheight() * star[1] + 1.0);
-	      }
-	
-	      shapes.drawColoredRect(colors.fg, 0, render.fbheight() / 2, render.fbwidth() / 2 - 100, render.fbheight());
-	      shapes.drawColoredRect(colors.fg, render.fbwidth() / 2 + 100, render.fbheight() / 2, render.fbwidth(), render.fbheight());
-	      shapes.drawColoredRect(colors.fg, game.mouse.x - 5, game.mouse.y - 5, game.mouse.x + 5, game.mouse.y + 5);
-	    },
-	    reflect: function reflect(y) {
-	      opMatrix.load.translate(0, y * 2, 0);matrix.multiply(opMatrix);
-	      opMatrix.load.scale(1, -1, 1);matrix.multiply(opMatrix);
-	    },
-	    tick: function tick(delta) {
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      shapes.useMatrix(matrix);
-	      shapes.useMaterial(shapesMaterial);
-	
-	      fb.bind();
-	      render.clear(colors.bg);
-	      self.drawScene();
-	      shapes.flush();
-	      font.useMatrix(matrix);
-	      font.draw(colors.bg, 0, render.height() - font.height, "Press Escape to go back");
-	      font.draw(colors.bg, 0, render.height() - 2 * font.height, "Try moving the mouse and tapping Z");
-	      font.flush();
-	
-	      fb.unbind();
-	
-	      render.clear(_gfxutils.Colors.RED);
-	      post.drawQuad(fb.getAttributes());
-	      post.flush();
-	
-	      transition.draw(delta);
-	      _time += delta;
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	  return self;
-	};
-
-/***/ },
-/* 20 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.PostProcessingTest2State = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1),
-	  fg: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
-	  water: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(0.8, 0.8, 1, 1), 0.2),
-	  stars: _gfxutils.ColorUtils.multRGB((0, _gfxutils.Color)(1, 0.8, 0.8, 1), 0.2)
-	};
-	
-	var PostProcessingTest2State = exports.PostProcessingTest2State = function PostProcessingTest2State(game, menu, transition) {
-	  var render = game.render;
-	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
-	    matrix: render.pixelMatrix
-	  });
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	  var fb = render.createFramebuffer(100); // 100 pixels of padding
-	  var _time = 0;
-	  var postMatrix = _math.Mat4.create();
-	  var post = render.createMaterial(_assetmgr.AssetManager.getAsset("posttest2.shader"), {
-	    framebuffer: fb.getTexture(),
-	    perlin: _assetmgr.AssetManager.getAsset("posttest2.perlin"),
-	    matrix: postMatrix,
-	    time: function time() {
-	      return _time;
-	    },
-	    pixwidth: function pixwidth() {
-	      return render.fbwidth();
-	    },
-	    pixheight: function pixheight() {
-	      return render.fbheight();
-	    }
-	  });
-	  var shapes = render.createShapeDrawer();
-	
-	  var opMatrix = _math.Mat4.create();
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	
-	  var kb = _keyboard.Keyboard.create();
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  var stars = [];
-	  for (var i = 0; i < 1000; i++) {
-	    stars.push([Math.random(), Math.random()]);
-	  }
-	
-	  var self = {
-	    initialize: function initialize() {},
-	    drawScene: function drawScene() {
-	      for (var _i = 0; _i < stars.length; _i++) {
-	        var star = stars[_i];
-	        shapes.drawColoredRect(colors.stars, render.width() * star[0] - 1.0, render.height() * star[1] - 1.0, render.width() * star[0] + 1.0, render.height() * star[1] + 1.0);
-	      }
-	
-	      shapes.drawColoredRect(colors.fg, 0, render.height() / 2, render.width() / 2 - 100, render.height());
-	      shapes.drawColoredRect(colors.fg, render.width() / 2 + 100, render.height() / 2, render.width(), render.height());
-	      shapes.drawColoredRect(colors.fg, game.mouse.x - 5, game.mouse.y - 5, game.mouse.x + 5, game.mouse.y + 5);
-	    },
-	    reflect: function reflect(y, matrix) {
-	      opMatrix.load.translate(0, y * 2, 0);matrix.multiply(opMatrix);
-	      opMatrix.load.scale(1, -1, 1);matrix.multiply(opMatrix);
-	    },
-	    tick: function tick(delta) {
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      shapes.useMatrix(matrix);
-	      shapes.useMaterial(shapesMaterial);
-	
-	      fb.bind();
-	      render.clear(colors.bg);
-	      self.drawScene();
-	      shapes.flush();
-	      fb.unbind();
-	
-	      render.clear(colors.bg);
-	      self.drawScene();
-	      shapes.flush();
-	
-	      render.setStencil(true);
-	      render.drawStencil();
-	      shapes.drawColoredRect(_gfxutils.Colors.WHITE, 0, render.height() / 2 + 100, render.width(), render.height());
-	      shapes.flush();
-	      render.drawColor();
-	
-	      postMatrix.load.from(render.pixelMatrix);
-	      self.reflect(render.height() / 2 + 100, postMatrix);
-	      post.drawQuad(fb.getAttributes());
-	      post.flush();
-	      render.setStencil(false);
-	
-	      font.useMatrix(matrix);
-	      font.draw(colors.bg, 0, render.height() - font.height, "Press Escape to go back");
-	      font.flush();
-	
-	      transition.draw(delta);
-	      _time += delta;
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	  return self;
-	};
-
-/***/ },
-/* 21 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.AboutState = undefined;
-	
-	var _assetmgr = __webpack_require__(7);
-	
-	var _gfxutils = __webpack_require__(10);
-	
-	var _math = __webpack_require__(8);
-	
-	var _keyboard = __webpack_require__(14);
-	
-	var colors = {
-	  bg: (0, _gfxutils.Color)(0.02, 0.02, 0.02, 1)
-	};
-	
-	var AboutState = exports.AboutState = function AboutState(game, menu, transition) {
-	  var render = game.render;
-	  var sfx = game.sound;
-	
-	  var matStack = _math.Mat4Stack.create();
-	  var matrix = _math.Mat4.create();
-	  var opMatrix = _math.Mat4.create();
-	
-	  var font = render.createFontRenderer(_assetmgr.AssetManager.getAsset("base.font.open_sans"), _assetmgr.AssetManager.getAsset("base.shader.flat.texcolor"));
-	
-	  var kb = _keyboard.Keyboard.create();
-	  kb.createKeybind("Escape").addPressCallback(function () {
-	    transition.to(menu, 750, 500);
-	  });
-	
-	  var self = {
-	    initialize: function initialize() {},
-	    tick: function tick(delta) {
-	      render.clear(colors.bg);
-	
-	      matStack.reset();
-	      matrix.load.identity();
-	      matStack.push(matrix);
-	
-	      font.useMatrix(matrix);
-	      font.draw(_gfxutils.Colors.WHITE, 0, render.height() - font.height, "Press Escape to go back");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 0, "Hey, I'm misson20000!");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 1, "This is my custom engine I'll be using for Ludum Dare 36.");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 2, "The Tools:");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 3, "- Text Editor: emacs");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 4, "- Language: EcmaScript 6 (emacs script :D)");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 5, "- Transpiler: Babel");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 6, "- Umm... webpacker: webpack");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 7, "- Music: LMMS");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 8, "- Images: GIMP");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 9, "- Browser: Mozilla Firefox Developer Edition");
-	      font.draw(_gfxutils.Colors.WHITE, 0, font.height * 10, "- Linux Distro: Arch Linux");
-	      font.flush();
-	
-	      transition.draw(delta);
-	    },
-	    getKeyboard: function getKeyboard() {
-	      return kb;
-	    }
-	  };
-	  return self;
-	};
-
-/***/ },
-/* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";

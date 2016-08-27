@@ -4,7 +4,8 @@
   "description": "Base code for Ludum Dare 36",
   "main": "index.js",
   "dependencies": {
-    "blob-util": "^1.2.1"
+    "blob-util": "^1.2.1",
+    "matter-js": "^0.10.0"
   },
   "devDependencies": {
     "babel-loader": "^6.2.4",
