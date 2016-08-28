@@ -7,6 +7,9 @@ let game = {};
 window.theGame = game;
 
 window.onload = () => {
+  let clickState = false;
+  let lastClickState = false;
+
   try {
     let canvas = document.getElementById("gamecanvas");
     game.render = WebGLRenderer(game, canvas, canvas.getContext("webgl", {
@@ -17,7 +20,12 @@ window.onload = () => {
       stencil: true      
     }));
     game.sound = SoundEngine(game);
-    game.mouse = {x: 0, y: 0};
+    game.mouse = {
+      x: 0, y: 0,
+      justClicked() {
+        return clickState && !lastClickState;
+      }
+    };
     
     game.switchState = (newstate) => {
       if(game.state && game.state.destroy) {
@@ -54,6 +62,8 @@ window.onload = () => {
     if(game.state && game.state.getKeyboard) {
       game.state.getKeyboard().update();
     }
+
+    lastClickState = clickState;
     
     window.requestAnimationFrame(game.tick);
   };
@@ -74,5 +84,12 @@ window.onload = () => {
   document.addEventListener("mousemove", (evt) => {
     game.mouse.x = evt.clientX;
     game.mouse.y = evt.clientY;
+  });
+
+  document.addEventListener("mousedown", (evt) => {
+    clickState = true;
+  });
+  document.addEventListener("mouseup", (evt) => {
+    clickState = false;
   });
 };

@@ -52,7 +52,7 @@
 	
 	var _assetmgr = __webpack_require__(7);
 	
-	var _sound = __webpack_require__(17);
+	var _sound = __webpack_require__(18);
 	
 	var game = {};
 	window.theGame = game;
@@ -166,6 +166,9 @@
 	    throw "Could not open WebGL context";
 	  }
 	  gl.enable(gl.BLEND);
+	  gl.enable(gl.DEPTH_TEST);
+	  gl.clearDepth(0);
+	  gl.depthFunc(gl.GEQUAL);
 	  gl.disable(gl.STENCIL_TEST);
 	  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 	  gl.stencilFunc(gl.ALWAYS, 0, 0xFF); // fill stencil buffer with ones
@@ -331,27 +334,28 @@
 	          var i = 0;
 	          var x = (width - render.width()) / (2 * width);
 	          var y = (height - render.height()) / (2 * height);
+	          var z = 0.9;
 	          attributes[i++] = 0;
 	          attributes[i++] = 0;
-	          attributes[i++] = 0;
+	          attributes[i++] = z;
 	          attributes[i++] = x;
 	          attributes[i++] = 1 - y;
 	
 	          attributes[i++] = render.width();
 	          attributes[i++] = 0;
-	          attributes[i++] = 0;
+	          attributes[i++] = z;
 	          attributes[i++] = 1 - x;
 	          attributes[i++] = 1 - y;
 	
 	          attributes[i++] = 0;
 	          attributes[i++] = render.height();
-	          attributes[i++] = 0;
+	          attributes[i++] = z;
 	          attributes[i++] = x;
 	          attributes[i++] = y;
 	
 	          attributes[i++] = render.width();
 	          attributes[i++] = render.height();
-	          attributes[i++] = 0;
+	          attributes[i++] = z;
 	          attributes[i++] = 1 - x;
 	          attributes[i++] = y;
 	          return attributes;
@@ -635,52 +639,64 @@
 	        useMatrix: function useMatrix(mat) {
 	          tform.useMatrix(mat);
 	        },
-	        drawColoredRect: function drawColoredRect(color, x1, y1, x2, y2) {
+	        drawColoredRect: function drawColoredRect(color, x1, y1, x2, y2, z) {
+	          if (z === undefined) {
+	            z = 0;
+	          }
 	          var i = 0;
 	          params[i++] = color;
-	          i = tform.into(params, i, x1, y1, 0);
-	          i = tform.into(params, i, x2, y1, 0);
-	          i = tform.into(params, i, x1, y2, 0);
-	          i = tform.into(params, i, x2, y2, 0);
+	          i = tform.into(params, i, x1, y1, z);
+	          i = tform.into(params, i, x2, y1, z);
+	          i = tform.into(params, i, x1, y2, z);
+	          i = tform.into(params, i, x2, y2, z);
 	          material.drawQuad(params);
 	        },
-	        drawColoredTriangle: function drawColoredTriangle(color, x1, y1, x2, y2, x3, y3) {
+	        drawColoredTriangle: function drawColoredTriangle(color, x1, y1, x2, y2, x3, y3, z) {
+	          if (z === undefined) {
+	            z = 0;
+	          }
 	          var i = 0;
 	          params[i++] = color;
-	          i = tform.into(params, i, x1, y1, 0);
-	          i = tform.into(params, i, x2, y2, 0);
-	          i = tform.into(params, i, x3, y3, 0);
+	          i = tform.into(params, i, x1, y1, z);
+	          i = tform.into(params, i, x2, y2, z);
+	          i = tform.into(params, i, x3, y3, z);
 	          material.drawTri(params);
 	        },
-	        drawTexturedRect: function drawTexturedRect(x1, y1, x2, y2, tx1, ty1, tx2, ty2) {
+	        drawTexturedRect: function drawTexturedRect(x1, y1, x2, y2, tx1, ty1, tx2, ty2, z) {
+	          if (z === undefined) {
+	            z = 0;
+	          }
 	          var i = 0;
-	          i = tform.into(params, i, x1, y1, 0);
+	          i = tform.into(params, i, x1, y1, z);
 	          params[i++] = tx1;
 	          params[i++] = ty1;
-	          i = tform.into(params, i, x2, y1, 0);
+	          i = tform.into(params, i, x2, y1, z);
 	          params[i++] = tx2;
 	          params[i++] = ty1;
-	          i = tform.into(params, i, x1, y2, 0);
+	          i = tform.into(params, i, x1, y2, z);
 	          params[i++] = tx1;
 	          params[i++] = ty2;
-	          i = tform.into(params, i, x2, y2, 0);
+	          i = tform.into(params, i, x2, y2, z);
 	          params[i++] = tx2;
 	          params[i++] = ty2;
 	          material.drawQuad(params);
 	        },
-	        drawTexturedAndColoredRect: function drawTexturedAndColoredRect(c, x1, y1, x2, y2, tx1, ty1, tx2, ty2) {
+	        drawTexturedAndColoredRect: function drawTexturedAndColoredRect(c, x1, y1, x2, y2, tx1, ty1, tx2, ty2, z) {
+	          if (z === undefined) {
+	            z = 0;
+	          }
 	          var i = 0;
 	          params[i++] = c;
-	          i = tform.into(params, i, x1, y1, 0);
+	          i = tform.into(params, i, x1, y1, z);
 	          params[i++] = tx1;
 	          params[i++] = ty1;
-	          i = tform.into(params, i, x2, y1, 0);
+	          i = tform.into(params, i, x2, y1, z);
 	          params[i++] = tx2;
 	          params[i++] = ty1;
-	          i = tform.into(params, i, x1, y2, 0);
+	          i = tform.into(params, i, x1, y2, z);
 	          params[i++] = tx1;
 	          params[i++] = ty2;
-	          i = tform.into(params, i, x2, y2, 0);
+	          i = tform.into(params, i, x2, y2, z);
 	          params[i++] = tx2;
 	          params[i++] = ty2;
 	          material.drawQuad(params);
@@ -2212,19 +2228,19 @@
 	
 	              params[i++] = x - sz;
 	              params[i++] = y;
-	              params[i++] = 0;
+	              params[i++] = 1;
 	
 	              params[i++] = x;
 	              params[i++] = y - sz;
-	              params[i++] = 0;
+	              params[i++] = 1;
 	
 	              params[i++] = x;
 	              params[i++] = y + sz;
-	              params[i++] = 0;
+	              params[i++] = 1;
 	
 	              params[i++] = x + sz;
 	              params[i++] = y;
-	              params[i++] = 0;
+	              params[i++] = 1;
 	              material.drawQuad(params);
 	            }
 	          }
@@ -2246,7 +2262,7 @@
 	Object.defineProperty(exports, "__esModule", {
 	  value: true
 	});
-	exports.PlayState = undefined;
+	exports.PlayState = exports.colors = undefined;
 	
 	var _assetmgr = __webpack_require__(7);
 	
@@ -2258,13 +2274,15 @@
 	
 	var _boat = __webpack_require__(15);
 	
+	var _begisland = __webpack_require__(17);
+	
 	var _box2dHtml = __webpack_require__(16);
 	
 	var box2d = _interopRequireWildcard(_box2dHtml);
 	
 	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 	
-	var colors = {
+	var colors = exports.colors = {
 	  bg: (0, _gfxutils.Color)("#2698FC"),
 	  cloud: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
 	  fg: (0, _gfxutils.Color)(0.8, 0.8, 1, 1),
@@ -2365,27 +2383,9 @@
 	  var objects = [];
 	
 	  var world = new box2d.b2World(new box2d.b2Vec2(0, 15));
-	  //  objects.push(BeginningIsland(world));
-	  var islandDef = new box2d.b2BodyDef();
-	  islandDef.position.Set(0, 0);
-	  var island = world.CreateBody(islandDef);
-	  var islandFixtureDef = new box2d.b2FixtureDef();
-	  var islandShape = new box2d.b2PolygonShape();
-	  islandFixtureDef.shape = islandShape;
-	  islandFixtureDef.friction = 0.3;
-	  islandFixtureDef.filter.categoryBits = 3;
-	  islandFixtureDef.filter.maskBits = 255;
-	  islandShape.Set([new box2d.b2Vec2(5, 1.75), new box2d.b2Vec2(-5, 1.75), new box2d.b2Vec2(-5, -1.25), new box2d.b2Vec2(5, -1.25)], 4);
-	  island.CreateFixture(islandFixtureDef);
-	  islandShape.Set([new box2d.b2Vec2(-5, -1.25), new box2d.b2Vec2(-10, .25), new box2d.b2Vec2(-5, .25)], 3);
-	  island.CreateFixture(islandFixtureDef);
-	  islandShape.Set([new box2d.b2Vec2(-10, .25), new box2d.b2Vec2(-27, 2.25), new box2d.b2Vec2(-10, 2.25)], 3);
-	  island.CreateFixture(islandFixtureDef);
-	  islandShape.Set([new box2d.b2Vec2(5, -1.25), new box2d.b2Vec2(10, .25), new box2d.b2Vec2(5, .25)], 3);
-	  island.CreateFixture(islandFixtureDef);
-	  islandFixtureDef.filter.categoryBits = 1;
-	  islandShape.Set([new box2d.b2Vec2(5, -.3), new box2d.b2Vec2(10, -.3), new box2d.b2Vec2(10, -.7), new box2d.b2Vec2(5, -.7)], 4);
-	  island.CreateFixture(islandFixtureDef);
+	  var island = (0, _begisland.BeginningIsland)(world);
+	  objects.push(island);
+	  objects.push((0, _begisland.BeginningHouse)(island, world));
 	
 	  var playerDef = new box2d.b2BodyDef();
 	  playerDef.type = box2d.b2BodyType.b2_dynamicBody;
@@ -2552,7 +2552,6 @@
 	      matStack.pop(matrix); // pop moon matrix
 	      matStack.pop(matrix); // pop celestial matrix
 	
-	      self.drawIsland();
 	      self.drawBody(playerBody, self.drawPlayer);
 	      for (var _i4 = 0; _i4 < objects.length; _i4++) {
 	        var body = objects[_i4].body;
@@ -2580,25 +2579,7 @@
 	      matStack.pop(matrix);
 	    },
 	    drawPlayer: function drawPlayer() {
-	      shapes.drawColoredRect(colors.player, -1, -1, 1, 1);
-	    },
-	    drawIsland: function drawIsland() {
-	      shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7);
-	      shapes.drawColoredRect(colors.dock, 14, -.7, 14.4, .5);
-	
-	      shapes.drawColoredRect(colors.dirt, -5, -1.25, 5, .25);
-	      shapes.drawColoredRect(colors.boatStake, 7.5, 0, 8, -2);
-	      shapes.drawColoredRect(colors.rope, 7.45, -1.4, 8.05, -1.9);
-	      shapes.drawColoredTriangle(colors.grass, -5, -1.25, -10, .25, -5, .25);
-	      shapes.drawColoredTriangle(colors.dirt, -5, -1, -10, .5, -5, .5);
-	      shapes.drawColoredTriangle(colors.grass, 5, -1.25, 10, .25, 5, .25);
-	      shapes.drawColoredTriangle(colors.dirt, 5, -1, 10, .5, 5, .5);
-	      shapes.drawColoredRect(colors.grass, -5, -1.25, 5, -1);
-	
-	      shapes.useMaterial(holoMaterial);
-	      shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25);
-	      shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7);
-	      shapes.useMaterial(shapesMaterial);
+	      shapes.drawColoredRect(colors.player, -1, -1, 1, 1, 0.5);
 	    },
 	    drawSun: function drawSun() {
 	      matStack.push(matrix);
@@ -2850,8 +2831,8 @@
 	      }
 	    },
 	    draw: function draw(shapes) {
-	      shapes.drawColoredRect(color, -2.5, -.75, 2.5, .75);
-	      shapes.drawColoredTriangle(color, 3.5, -.75, 2.5, -.75, 2.5, .75);
+	      shapes.drawColoredRect(color, -2.5, -.75, 2.5, .75, 0.5);
+	      shapes.drawColoredTriangle(color, 3.5, -.75, 2.5, -.75, 2.5, .75, 0.5);
 	    },
 	    tick: function tick() {
 	      if (riding) {
@@ -2883,6 +2864,80 @@
 
 /***/ },
 /* 17 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.BeginningHouse = exports.BeginningIsland = undefined;
+	
+	var _play = __webpack_require__(13);
+	
+	var _box2dHtml = __webpack_require__(16);
+	
+	var box2d = _interopRequireWildcard(_box2dHtml);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
+	var BeginningIsland = exports.BeginningIsland = function BeginningIsland(world) {
+	  var bodyDef = new box2d.b2BodyDef();
+	  bodyDef.position.Set(0, 0);
+	  var body = world.CreateBody(bodyDef);
+	  var fixtureDef = new box2d.b2FixtureDef();
+	  var shape = new box2d.b2PolygonShape();
+	  fixtureDef.shape = shape;
+	  fixtureDef.friction = 0.3;
+	  fixtureDef.filter.categoryBits = 3;
+	  fixtureDef.filter.maskBits = 255;
+	  shape.Set([new box2d.b2Vec2(5, 1.75), new box2d.b2Vec2(-5, 1.75), new box2d.b2Vec2(-5, -1.25), new box2d.b2Vec2(5, -1.25)], 4);
+	  body.CreateFixture(fixtureDef);
+	  shape.Set([new box2d.b2Vec2(-5, -1.25), new box2d.b2Vec2(-10, .25), new box2d.b2Vec2(-5, .25)], 3);
+	  body.CreateFixture(fixtureDef);
+	  shape.Set([new box2d.b2Vec2(-10, .25), new box2d.b2Vec2(-27, 2.25), new box2d.b2Vec2(-10, 2.25)], 3);
+	  body.CreateFixture(fixtureDef);
+	  shape.Set([new box2d.b2Vec2(5, -1.25), new box2d.b2Vec2(10, .25), new box2d.b2Vec2(5, .25)], 3);
+	  body.CreateFixture(fixtureDef);
+	  fixtureDef.filter.categoryBits = 1;
+	  shape.Set([new box2d.b2Vec2(5, -.3), new box2d.b2Vec2(10, -.3), new box2d.b2Vec2(10, -.7), new box2d.b2Vec2(5, -.7)], 4);
+	  body.CreateFixture(fixtureDef);
+	
+	  var self = {
+	    body: body,
+	    draw: function draw(shapes) {
+	      var z = 0.6;
+	      shapes.drawColoredRect(_play.colors.dock, 5, -.3, 15, -.7, z);
+	      shapes.drawColoredRect(_play.colors.dock, 14, -.7, 14.4, .5, z);
+	
+	      shapes.drawColoredRect(_play.colors.dirt, -5, -1.25, 5, .25, z);
+	      shapes.drawColoredRect(_play.colors.boatStake, 7.5, 0, 8, -2, z);
+	      shapes.drawColoredRect(_play.colors.rope, 7.45, -1.4, 8.05, -1.9, z);
+	      shapes.drawColoredTriangle(_play.colors.grass, -5, -1.25, -10, .25, -5, .25, z);
+	      shapes.drawColoredTriangle(_play.colors.dirt, -5, -1, -10, .5, -5, .5, z);
+	      shapes.drawColoredTriangle(_play.colors.grass, 5, -1.25, 10, .25, 5, .25, z);
+	      shapes.drawColoredTriangle(_play.colors.dirt, 5, -1, 10, .5, 5, .5, z);
+	      shapes.drawColoredRect(_play.colors.grass, -5, -1.25, 5, -1, z);
+	    }
+	  };
+	  body.SetUserData(self);
+	  return self;
+	};
+	
+	var BeginningHouse = exports.BeginningHouse = function BeginningHouse(island, world) {
+	  return {
+	    body: island.body,
+	    isHologram: true,
+	    draw: function draw(shapes) {
+	      var z = 0.4;
+	      shapes.drawColoredRect(_play.colors.houseBody, -4, -5, 0, -1.25, z);
+	      shapes.drawColoredTriangle(_play.colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7, z);
+	    }
+	  };
+	};
+
+/***/ },
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";

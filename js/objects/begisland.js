@@ -43,6 +43,7 @@ export let BeginningIsland = (world) => {
 
   let self = {
     body,
+    isHologram: false,
     draw(shapes) {
       let z = 0.6;
       shapes.drawColoredRect(colors.dock, 5, -.3, 15, -.7, z);
@@ -63,13 +64,36 @@ export let BeginningIsland = (world) => {
 };
 
 export let BeginningHouse = (island, world) => {
-  return {
-    body: island.body,
+  let bodyDef = new box2d.b2BodyDef();
+  bodyDef.position.Set(-2, -1.25);
+  let body = world.CreateBody(bodyDef);
+  let fixtureDef = new box2d.b2FixtureDef();
+  let shape = new box2d.b2PolygonShape();
+  fixtureDef.shape = shape;
+  shape.Set([
+    new box2d.b2Vec2(-2, -3.75),
+    new box2d.b2Vec2(-2, 0),
+    new box2d.b2Vec2(2, 0),
+    new box2d.b2Vec2(2, -3.75)], 4);
+  body.CreateFixture(fixtureDef);
+  shape.Set([
+    new box2d.b2Vec2(-2.5, -3.75),
+    new box2d.b2Vec2(2.5, -3.75),
+    new box2d.b2Vec2(0, -5.75)], 3);
+  body.CreateFixture(fixtureDef);
+
+  let self = {
+    body: body,
     isHologram: true,
     draw(shapes) {
       let z = 0.4;
-      shapes.drawColoredRect(colors.houseBody, -4, -5, 0, -1.25, z);
-      shapes.drawColoredTriangle(colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7, z);
+      shapes.drawColoredRect(colors.houseBody, -2, -3.75, 2, 0, z);
+      shapes.drawColoredTriangle(colors.houseRoof, -2.5, -3.75, 2.5, -3.75, 0, -5.75, z);
+    },
+    shouldCollide(a, b, c) {
+      return false;
     }
   };
+  body.SetUserData(self);
+  return self;
 };

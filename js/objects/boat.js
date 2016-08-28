@@ -52,14 +52,29 @@ export let Boat = (world, buoyancy, player, isHologram) => {
   ], 4);
   fixtureDef.isSensor = true;
   let sensor = body.CreateFixture(fixtureDef);
+  shape.Set([
+    new box2d.b2Vec2(-2.3, -.75),
+    new box2d.b2Vec2(2.3, -.75),
+    new box2d.b2Vec2(2.3, .5),
+    new box2d.b2Vec2(-2.3, .5)
+  ], 4);
+  fixtureDef.isSensor = false;
+  let area = body.CreateFixture(fixtureDef);
+  let noCollide = {
+    noCollide: true
+  };
+  sensor.SetUserData(noCollide);
+  area.SetUserData(noCollide);
+  
   buoyancy.AddBody(body);
 
   let riding = false;
-  let force = new box2d.b2Vec2(100, 0);
+  let force = new box2d.b2Vec2(200, 0);
   
   let self = {
     body,
     isHologram,
+    isDynamic: true,
     BeginContact(a, b) {
       if(a == sensor && b.GetBody() == player) {
         riding = true;

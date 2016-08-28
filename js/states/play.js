@@ -3,6 +3,8 @@ import {Colors, Color, ColorUtils} from "../gfxutils.js";
 import {Mat4, Mat4Stack} from "../math.js";
 import {Keyboard} from "../keyboard.js";
 import {Boat} from "../objects/boat.js";
+import {Player} from "../objects/player.js";
+import {Tablet} from "../objects/tablet.js";
 import {BeginningIsland, BeginningHouse} from "../objects/begisland.js";
 import * as box2d from "box2d-html5";
 
@@ -47,6 +49,12 @@ export let PlayState = (game, transition) => {
   let render = game.render;
   let shapesMaterial = render.createMaterial(AssetManager.getAsset("base.shader.flat.color"), {
     matrix: render.pixelMatrix
+  });
+  let tabletMaterial = render.createMaterial(AssetManager.getAsset("game.shader.tablet"), {
+    matrix: render.pixelMatrix,
+    time: () => {
+      return time;
+    }
   });
   let holoMaterial = render.createMaterial(AssetManager.getAsset("game.shader.hologram"), {
     matrix: render.pixelMatrix,
@@ -101,34 +109,60 @@ export let PlayState = (game, transition) => {
   let buoyancy = new box2d.b2BuoyancyController();
   buoyancy.normal.Set(0, -1);
   buoyancy.offset = 0;
-  buoyancy.density = 5;
+  buoyancy.density = 3;
   buoyancy.linearDrag = 5;
   buoyancy.angularDrag = 2;
 
   let objects = [];
+  let holoObject;
+  let inHologramMode = false;
   
   let world = new box2d.b2World(new box2d.b2Vec2(0, 15));
+
+  let manager = {
+    world,
+    remove(object) {
+      world.DestroyBody(object.body);
+      object.body.SetActive(false);
+      let idx = objects.indexOf(object);
+      if(idx >= 0) {
+        objects.splice(idx, 1);
+      }
+    }
+  };
+  
   let island = BeginningIsland(world);
+  let player = Player(world, buoyancy);
+  let tablet = Tablet(manager, buoyancy, player, tabletMaterial);
   objects.push(island);
   objects.push(BeginningHouse(island, world));
-
-  let playerDef = new box2d.b2BodyDef();
-  playerDef.type = box2d.b2BodyType.b2_dynamicBody;
-  playerDef.position.Set(0, -10);
-  let playerBody = world.CreateBody(playerDef);
-  let playerBox = new box2d.b2PolygonShape();
-  playerBox.SetAsBox(1, 1);
-  let playerFixtureDef = new box2d.b2FixtureDef();
-  playerFixtureDef.shape = playerBox;
-  playerFixtureDef.density = 1;
-  playerFixtureDef.friction = 0.7;
-  playerFixtureDef.filter.categoryBits = 0b111111;
-  playerBody.CreateFixture(playerFixtureDef);
-  buoyancy.AddBody(playerBody);
-
-  objects.push(Boat(world, buoyancy, playerBody, true));
+  objects.push(player);
+  objects.push(Boat(world, buoyancy, player.body, true));
+  objects.push(tablet);
   
   world.AddController(buoyancy);
+  world.SetContactFilter({
+    ShouldCollide(a, b) {
+      let objA = a.GetBody().GetUserData();
+      let objB = b.GetBody().GetUserData();
+      if((a.GetUserData() && a.GetUserData().noCollide)
+         || (b.GetUserData() && b.GetUserData().noCollide)) {
+        return false;
+      }
+      if(objA && objA.isHologram) {
+        return false;
+      }
+      if(objB && objB.isHologram) {
+        return false;
+      }
+      if(objA && objB) {
+        return objA.shouldCollide ? objA.shouldCollide(objB, a, b) : true &&
+          objB.shouldCollide ? objB.shouldCollide(objA, b, a) : true;
+      } else {
+        return true;
+      }
+    }
+  });
   world.SetContactListener({
     BeginContact(contact) {
       let a = contact.GetFixtureA();
@@ -143,7 +177,7 @@ export let PlayState = (game, transition) => {
       }
     },
     EndContact(contact) {
-            let a = contact.GetFixtureA();
+      let a = contact.GetFixtureA();
       let b = contact.GetFixtureB();
       let aData = a.GetBody().GetUserData();
       let bData = b.GetBody().GetUserData();
@@ -159,14 +193,23 @@ export let PlayState = (game, transition) => {
     PostSolve(contact, impulse) {
     }
   });
+
+  let b2aabb = new box2d.b2AABB();
   
   let kb = Keyboard.create();
   let binds = {
-    left: kb.createKeybind("ArrowLeft"),
-    right: kb.createKeybind("ArrowRight")
+    left: kb.createKeybind("ArrowLeft", "a"),
+    right: kb.createKeybind("ArrowRight", "d")
   };
 
   let b2timer = 0;
+  let hoverQueryCallback = (fixture) => {
+    let object = fixture.GetBody().GetUserData();
+    if(object) {
+      object.hovering = true;
+    }
+    return true;
+  };
   
   let self = {
     initialize() {
@@ -174,9 +217,9 @@ export let PlayState = (game, transition) => {
       for(let i = 0; i < 2000; i+= 5) {
         world.Step(5.0 / 1000.0, 8, 3);
       }
-      for(let i = 0; i < objects[i]; i++) {
+      for(let i = 0; i < objects.length; i++) {
         if(objects[i].isHologram) {
-          objects[i].body.SetActive(false);
+          objects[i].body.SetType(box2d.b2BodyType.b2_staticBody);
         }
       }
     },
@@ -283,7 +326,6 @@ export let PlayState = (game, transition) => {
       matStack.pop(matrix); // pop moon matrix
       matStack.pop(matrix); // pop celestial matrix
 
-      self.drawBody(playerBody, self.drawPlayer);
       for(let i = 0; i < objects.length; i++) {
         let body = objects[i].body;
         matStack.push(matrix);
@@ -291,10 +333,25 @@ export let PlayState = (game, transition) => {
         matrix.multiply(opMatrix);
         opMatrix.load.rotate(body.GetAngleRadians());
         matrix.multiply(opMatrix);
-        if(objects[i].isHologram) {
-          shapes.useMaterial(holoMaterial);
+        if(inHologramMode || !objects[i].isHologram) {
+          if(objects[i].isHologram) {
+            shapes.useMaterial(holoMaterial);
+            if(objects[i].hovering) {
+              opMatrix.load.scale(1.1, 1.1, 1);
+              matrix.multiply(opMatrix);
+              if(game.mouse.justClicked()) {
+                if(holoObject) {
+                  holoObject.isHologram = true;
+                  holoObject.body.SetType(box2d.b2BodyType.b2_staticBody);
+                }
+                holoObject = objects[i];
+                holoObject.body.SetType(holoObject.isDynamic ? box2d.b2BodyType.b2_dynamicBody : box2d.b2BodyType.b2_staticBody);
+                holoObject.isHologram = false;
+              }
+            }
+          }
+          objects[i].draw(shapes);
         }
-        objects[i].draw(shapes);
         shapes.useMaterial(shapesMaterial);
         matStack.pop(matrix);
       }
@@ -308,9 +365,6 @@ export let PlayState = (game, transition) => {
       matrix.multiply(opMatrix);
       cb();
       matStack.pop(matrix);
-    },
-    drawPlayer() {
-      shapes.drawColoredRect(colors.player, -1, -1, 1, 1, 0.5);
     },
     drawSun() {
       matStack.push(matrix);
@@ -346,15 +400,15 @@ export let PlayState = (game, transition) => {
         b2timer-= 5;
       }
 
-      camera.x = playerBody.GetPosition().x * 40;
-      camera.y = playerBody.GetPosition().y * 40;
+      camera.x = player.body.GetPosition().x * 40;
+      camera.y = player.body.GetPosition().y * 40;
       
       if(binds.right.isPressed()) {
-        playerBody.SetAngularVelocity(2);
+        player.body.SetAngularVelocity(2);
       }
 
       if(binds.left.isPressed()) {
-        playerBody.SetAngularVelocity(-2);
+        player.body.SetAngularVelocity(-2);
       }
 
       for(let i = 0; i < objects.length; i++) {
@@ -391,6 +445,34 @@ export let PlayState = (game, transition) => {
       
       post.drawQuad(fb.getAttributes());
       post.flush();
+
+      matrix.load.identity();
+      opMatrix.load.translate(35, 30, 0);
+      matrix.multiply(opMatrix);
+
+      if(tablet.isCollected()) {
+        let tabletHover = game.mouse.x > 35-0.9*30 && game.mouse.y > 30-0.7*30 && game.mouse.x < 35+0.9*30 && game.mouse.y < 30+0.7*30;
+        
+        opMatrix.load.scale(tabletHover ? 75 : 60, tabletHover ? 75 : 60, 1);
+        matrix.multiply(opMatrix);
+        
+        shapes.useMatrix(matrix);
+        tablet.draw(shapes);
+        shapes.flush();
+        
+        if(tabletHover && game.mouse.justClicked()) {
+          inHologramMode = !inHologramMode;
+        }
+      }
+
+      for(let i = 0; i < objects.length; i++) {
+        objects[i].hovering = false;
+      }
+      b2aabb.lowerBound.Set((game.mouse.x - render.width()/2  + camera.x - 1) / 40.0,
+                            (game.mouse.y - render.height()/2 + camera.y - 1) / 40.0);
+      b2aabb.upperBound.Set((game.mouse.x - render.width()/2  + camera.x + 1) / 40.0,
+                            (game.mouse.y - render.height()/2 + camera.y + 1) / 40.0);
+      world.QueryAABB(hoverQueryCallback, b2aabb);
       
       transition.draw(delta);
       time+= delta;
