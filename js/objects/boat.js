@@ -21,7 +21,7 @@ export let Boat = (world, buoyancy, player, isHologram) => {
     new box2d.b2Vec2(-2.5, .5)
   ], 4);
   body.CreateFixture(fixtureDef);
-  shape.Set([
+  shape.Set([ // right side
     new box2d.b2Vec2(2.3, .5),
     new box2d.b2Vec2(2.3, -.75),
     new box2d.b2Vec2(3.5, -.75),
@@ -47,8 +47,8 @@ export let Boat = (world, buoyancy, player, isHologram) => {
   shape.Set([
     new box2d.b2Vec2(-2.3, .5),
     new box2d.b2Vec2(2.3, .5),
-    new box2d.b2Vec2(2.3, 0),
-    new box2d.b2Vec2(-2.3, 0)
+    new box2d.b2Vec2(2.3, .4),
+    new box2d.b2Vec2(-2.3, .4)
   ], 4);
   fixtureDef.isSensor = true;
   let sensor = body.CreateFixture(fixtureDef);
@@ -63,13 +63,13 @@ export let Boat = (world, buoyancy, player, isHologram) => {
   let noCollide = {
     noCollide: true
   };
-  sensor.SetUserData(noCollide);
   area.SetUserData(noCollide);
   
   buoyancy.AddBody(body);
 
   let riding = false;
   let force = new box2d.b2Vec2(200, 0);
+  let hitWall = false;
   
   let self = {
     body,
@@ -78,6 +78,11 @@ export let Boat = (world, buoyancy, player, isHologram) => {
     BeginContact(a, b) {
       if(a == sensor && b.GetBody() == player) {
         riding = true;
+      }
+      if(b.GetUserData() && b.GetUserData().stopsBoats) {
+        hitWall = true;
+        force.x = 50;
+        console.log("stopping boat");
       }
     },
     EndContact(a, b) {

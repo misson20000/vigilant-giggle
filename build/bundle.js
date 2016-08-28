@@ -52,12 +52,15 @@
 	
 	var _assetmgr = __webpack_require__(7);
 	
-	var _sound = __webpack_require__(18);
+	var _sound = __webpack_require__(20);
 	
 	var game = {};
 	window.theGame = game;
 	
 	window.onload = function () {
+	  var clickState = false;
+	  var lastClickState = false;
+	
 	  try {
 	    var canvas = document.getElementById("gamecanvas");
 	    game.render = (0, _webgl.WebGLRenderer)(game, canvas, canvas.getContext("webgl", {
@@ -68,7 +71,12 @@
 	      stencil: true
 	    }));
 	    game.sound = (0, _sound.SoundEngine)(game);
-	    game.mouse = { x: 0, y: 0 };
+	    game.mouse = {
+	      x: 0, y: 0,
+	      justClicked: function justClicked() {
+	        return clickState && !lastClickState;
+	      }
+	    };
 	
 	    game.switchState = function (newstate) {
 	      if (game.state && game.state.destroy) {
@@ -106,6 +114,8 @@
 	      game.state.getKeyboard().update();
 	    }
 	
+	    lastClickState = clickState;
+	
 	    window.requestAnimationFrame(game.tick);
 	  };
 	  window.requestAnimationFrame(game.tick);
@@ -125,6 +135,13 @@
 	  document.addEventListener("mousemove", function (evt) {
 	    game.mouse.x = evt.clientX;
 	    game.mouse.y = evt.clientY;
+	  });
+	
+	  document.addEventListener("mousedown", function (evt) {
+	    clickState = true;
+	  });
+	  document.addEventListener("mouseup", function (evt) {
+	    clickState = false;
 	  });
 	};
 
@@ -2274,7 +2291,11 @@
 	
 	var _boat = __webpack_require__(15);
 	
-	var _begisland = __webpack_require__(17);
+	var _player = __webpack_require__(17);
+	
+	var _tablet = __webpack_require__(18);
+	
+	var _begisland = __webpack_require__(19);
 	
 	var _box2dHtml = __webpack_require__(16);
 	
@@ -2323,6 +2344,12 @@
 	  var render = game.render;
 	  var shapesMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("base.shader.flat.color"), {
 	    matrix: render.pixelMatrix
+	  });
+	  var tabletMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("game.shader.tablet"), {
+	    matrix: render.pixelMatrix,
+	    time: function time() {
+	      return _time;
+	    }
 	  });
 	  var holoMaterial = render.createMaterial(_assetmgr.AssetManager.getAsset("game.shader.hologram"), {
 	    matrix: render.pixelMatrix,
@@ -2376,34 +2403,58 @@
 	  var buoyancy = new box2d.b2BuoyancyController();
 	  buoyancy.normal.Set(0, -1);
 	  buoyancy.offset = 0;
-	  buoyancy.density = 5;
+	  buoyancy.density = 3;
 	  buoyancy.linearDrag = 5;
 	  buoyancy.angularDrag = 2;
 	
 	  var objects = [];
+	  var holoObject = void 0;
+	  var inHologramMode = false;
 	
 	  var world = new box2d.b2World(new box2d.b2Vec2(0, 15));
+	
+	  var manager = {
+	    world: world,
+	    remove: function remove(object) {
+	      world.DestroyBody(object.body);
+	      object.body.SetActive(false);
+	      var idx = objects.indexOf(object);
+	      if (idx >= 0) {
+	        objects.splice(idx, 1);
+	      }
+	    }
+	  };
+	
 	  var island = (0, _begisland.BeginningIsland)(world);
+	  var player = (0, _player.Player)(world, buoyancy);
+	  var tablet = (0, _tablet.Tablet)(manager, buoyancy, player, tabletMaterial);
 	  objects.push(island);
 	  objects.push((0, _begisland.BeginningHouse)(island, world));
-	
-	  var playerDef = new box2d.b2BodyDef();
-	  playerDef.type = box2d.b2BodyType.b2_dynamicBody;
-	  playerDef.position.Set(0, -10);
-	  var playerBody = world.CreateBody(playerDef);
-	  var playerBox = new box2d.b2PolygonShape();
-	  playerBox.SetAsBox(1, 1);
-	  var playerFixtureDef = new box2d.b2FixtureDef();
-	  playerFixtureDef.shape = playerBox;
-	  playerFixtureDef.density = 1;
-	  playerFixtureDef.friction = 0.7;
-	  playerFixtureDef.filter.categoryBits = 63;
-	  playerBody.CreateFixture(playerFixtureDef);
-	  buoyancy.AddBody(playerBody);
-	
-	  objects.push((0, _boat.Boat)(world, buoyancy, playerBody, true));
+	  objects.push(player);
+	  objects.push((0, _boat.Boat)(world, buoyancy, player.body, true));
+	  objects.push(tablet);
 	
 	  world.AddController(buoyancy);
+	  world.SetContactFilter({
+	    ShouldCollide: function ShouldCollide(a, b) {
+	      var objA = a.GetBody().GetUserData();
+	      var objB = b.GetBody().GetUserData();
+	      if (a.GetUserData() && a.GetUserData().noCollide || b.GetUserData() && b.GetUserData().noCollide) {
+	        return false;
+	      }
+	      if (objA && objA.isHologram) {
+	        return false;
+	      }
+	      if (objB && objB.isHologram) {
+	        return false;
+	      }
+	      if (objA && objB) {
+	        return objA.shouldCollide ? objA.shouldCollide(objB, a, b) : true && objB.shouldCollide ? objB.shouldCollide(objA, b, a) : true;
+	      } else {
+	        return true;
+	      }
+	    }
+	  });
 	  world.SetContactListener({
 	    BeginContact: function BeginContact(contact) {
 	      var a = contact.GetFixtureA();
@@ -2433,13 +2484,22 @@
 	    PostSolve: function PostSolve(contact, impulse) {}
 	  });
 	
+	  var b2aabb = new box2d.b2AABB();
+	
 	  var kb = _keyboard.Keyboard.create();
 	  var binds = {
-	    left: kb.createKeybind("ArrowLeft"),
-	    right: kb.createKeybind("ArrowRight")
+	    left: kb.createKeybind("ArrowLeft", "a"),
+	    right: kb.createKeybind("ArrowRight", "d")
 	  };
 	
 	  var b2timer = 0;
+	  var hoverQueryCallback = function hoverQueryCallback(fixture) {
+	    var object = fixture.GetBody().GetUserData();
+	    if (object) {
+	      object.hovering = true;
+	    }
+	    return true;
+	  };
 	
 	  var self = {
 	    initialize: function initialize() {
@@ -2447,9 +2507,9 @@
 	      for (var _i = 0; _i < 2000; _i += 5) {
 	        world.Step(5.0 / 1000.0, 8, 3);
 	      }
-	      for (var _i2 = 0; _i2 < objects[_i2]; _i2++) {
+	      for (var _i2 = 0; _i2 < objects.length; _i2++) {
 	        if (objects[_i2].isHologram) {
-	          objects[_i2].body.SetActive(false);
+	          objects[_i2].body.SetType(box2d.b2BodyType.b2_staticBody);
 	        }
 	      }
 	    },
@@ -2552,7 +2612,6 @@
 	      matStack.pop(matrix); // pop moon matrix
 	      matStack.pop(matrix); // pop celestial matrix
 	
-	      self.drawBody(playerBody, self.drawPlayer);
 	      for (var _i4 = 0; _i4 < objects.length; _i4++) {
 	        var body = objects[_i4].body;
 	        matStack.push(matrix);
@@ -2560,10 +2619,25 @@
 	        matrix.multiply(opMatrix);
 	        opMatrix.load.rotate(body.GetAngleRadians());
 	        matrix.multiply(opMatrix);
-	        if (objects[_i4].isHologram) {
-	          shapes.useMaterial(holoMaterial);
+	        if (inHologramMode || !objects[_i4].isHologram) {
+	          if (objects[_i4].isHologram) {
+	            shapes.useMaterial(holoMaterial);
+	            if (objects[_i4].hovering) {
+	              opMatrix.load.scale(1.1, 1.1, 1);
+	              matrix.multiply(opMatrix);
+	              if (game.mouse.justClicked()) {
+	                if (holoObject) {
+	                  holoObject.isHologram = true;
+	                  holoObject.body.SetType(box2d.b2BodyType.b2_staticBody);
+	                }
+	                holoObject = objects[_i4];
+	                holoObject.body.SetType(holoObject.isDynamic ? box2d.b2BodyType.b2_dynamicBody : box2d.b2BodyType.b2_staticBody);
+	                holoObject.isHologram = false;
+	              }
+	            }
+	          }
+	          objects[_i4].draw(shapes);
 	        }
-	        objects[_i4].draw(shapes);
 	        shapes.useMaterial(shapesMaterial);
 	        matStack.pop(matrix);
 	      }
@@ -2577,9 +2651,6 @@
 	      matrix.multiply(opMatrix);
 	      cb();
 	      matStack.pop(matrix);
-	    },
-	    drawPlayer: function drawPlayer() {
-	      shapes.drawColoredRect(colors.player, -1, -1, 1, 1, 0.5);
 	    },
 	    drawSun: function drawSun() {
 	      matStack.push(matrix);
@@ -2615,15 +2686,15 @@
 	        b2timer -= 5;
 	      }
 	
-	      camera.x = playerBody.GetPosition().x * 40;
-	      camera.y = playerBody.GetPosition().y * 40;
+	      camera.x = player.body.GetPosition().x * 40;
+	      camera.y = player.body.GetPosition().y * 40;
 	
 	      if (binds.right.isPressed()) {
-	        playerBody.SetAngularVelocity(2);
+	        player.body.SetAngularVelocity(2);
 	      }
 	
 	      if (binds.left.isPressed()) {
-	        playerBody.SetAngularVelocity(-2);
+	        player.body.SetAngularVelocity(-2);
 	      }
 	
 	      for (var _i6 = 0; _i6 < objects.length; _i6++) {
@@ -2660,6 +2731,32 @@
 	
 	      post.drawQuad(fb.getAttributes());
 	      post.flush();
+	
+	      matrix.load.identity();
+	      opMatrix.load.translate(35, 30, 0);
+	      matrix.multiply(opMatrix);
+	
+	      if (tablet.isCollected()) {
+	        var tabletHover = game.mouse.x > 35 - 0.9 * 30 && game.mouse.y > 30 - 0.7 * 30 && game.mouse.x < 35 + 0.9 * 30 && game.mouse.y < 30 + 0.7 * 30;
+	
+	        opMatrix.load.scale(tabletHover ? 75 : 60, tabletHover ? 75 : 60, 1);
+	        matrix.multiply(opMatrix);
+	
+	        shapes.useMatrix(matrix);
+	        tablet.draw(shapes);
+	        shapes.flush();
+	
+	        if (tabletHover && game.mouse.justClicked()) {
+	          inHologramMode = !inHologramMode;
+	        }
+	      }
+	
+	      for (var _i7 = 0; _i7 < objects.length; _i7++) {
+	        objects[_i7].hovering = false;
+	      }
+	      b2aabb.lowerBound.Set((game.mouse.x - render.width() / 2 + camera.x - 1) / 40.0, (game.mouse.y - render.height() / 2 + camera.y - 1) / 40.0);
+	      b2aabb.upperBound.Set((game.mouse.x - render.width() / 2 + camera.x + 1) / 40.0, (game.mouse.y - render.height() / 2 + camera.y + 1) / 40.0);
+	      world.QueryAABB(hoverQueryCallback, b2aabb);
 	
 	      transition.draw(delta);
 	      _time += delta;
@@ -2812,14 +2909,24 @@
 	  shape.Set([new box2d.b2Vec2(-2.3, .5), new box2d.b2Vec2(2.3, .5), new box2d.b2Vec2(2.3, 0), new box2d.b2Vec2(-2.3, 0)], 4);
 	  fixtureDef.isSensor = true;
 	  var sensor = body.CreateFixture(fixtureDef);
+	  shape.Set([new box2d.b2Vec2(-2.3, -.75), new box2d.b2Vec2(2.3, -.75), new box2d.b2Vec2(2.3, .5), new box2d.b2Vec2(-2.3, .5)], 4);
+	  fixtureDef.isSensor = false;
+	  var area = body.CreateFixture(fixtureDef);
+	  var noCollide = {
+	    noCollide: true
+	  };
+	  sensor.SetUserData(noCollide);
+	  area.SetUserData(noCollide);
+	
 	  buoyancy.AddBody(body);
 	
 	  var riding = false;
-	  var force = new box2d.b2Vec2(100, 0);
+	  var force = new box2d.b2Vec2(200, 0);
 	
 	  var self = {
 	    body: body,
 	    isHologram: isHologram,
+	    isDynamic: true,
 	    BeginContact: function BeginContact(a, b) {
 	      if (a == sensor && b.GetBody() == player) {
 	        riding = true;
@@ -2871,6 +2978,112 @@
 	Object.defineProperty(exports, "__esModule", {
 	  value: true
 	});
+	exports.Player = undefined;
+	
+	var _play = __webpack_require__(13);
+	
+	var _box2dHtml = __webpack_require__(16);
+	
+	var box2d = _interopRequireWildcard(_box2dHtml);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
+	var Player = exports.Player = function Player(world, buoyancy) {
+	  var bodyDef = new box2d.b2BodyDef();
+	  bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
+	  bodyDef.position.Set(0, -10);
+	  var body = world.CreateBody(bodyDef);
+	  var shape = new box2d.b2PolygonShape();
+	  shape.SetAsBox(1, 1);
+	  var fixtureDef = new box2d.b2FixtureDef();
+	  fixtureDef.shape = shape;
+	  fixtureDef.density = 1;
+	  fixtureDef.friction = 0.7;
+	  fixtureDef.filter.categoryBits = 63;
+	  body.CreateFixture(fixtureDef);
+	  buoyancy.AddBody(body);
+	
+	  var self = {
+	    body: body,
+	    isHologram: false,
+	    draw: function draw(shapes) {
+	      shapes.drawColoredRect(_play.colors.player, -1, -1, 1, 1, 0.5);
+	    }
+	  };
+	  body.SetUserData(self);
+	  return self;
+	};
+
+/***/ },
+/* 18 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.Tablet = undefined;
+	
+	var _gfxutils = __webpack_require__(10);
+	
+	var _box2dHtml = __webpack_require__(16);
+	
+	var box2d = _interopRequireWildcard(_box2dHtml);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
+	var Tablet = exports.Tablet = function Tablet(manager, buoyancy, player, mat) {
+	  var size = {
+	    w: 0.9,
+	    h: 0.7
+	  };
+	
+	  var bodyDef = new box2d.b2BodyDef();
+	  bodyDef.type = box2d.b2BodyType.b2_dynamicBody;
+	  bodyDef.position.Set(-10, -10);
+	  var body = manager.world.CreateBody(bodyDef);
+	  var shape = new box2d.b2PolygonShape();
+	  shape.SetAsBox(size.w / 2, size.h / 2);
+	  var fixtureDef = new box2d.b2FixtureDef();
+	  fixtureDef.shape = shape;
+	  fixtureDef.density = 1;
+	  fixtureDef.friction = 0.7;
+	  fixtureDef.filter.categoryBits = 63;
+	  body.CreateFixture(fixtureDef);
+	  buoyancy.AddBody(body);
+	
+	  var collected = false;
+	
+	  var self = {
+	    body: body,
+	    draw: function draw(shapes) {
+	      shapes.useMaterial(mat);
+	      shapes.drawTexturedRect(-size.w / 2, -size.h / 2, size.w / 2, size.h / 2, 0, 0, 1, 1, 0.55);
+	    },
+	    BeginContact: function BeginContact(a, b) {
+	      if (b.GetBody() == player.body) {
+	        manager.remove(self);
+	        collected = true;
+	      }
+	    },
+	    isCollected: function isCollected() {
+	      return collected;
+	    }
+	  };
+	  body.SetUserData(self);
+	  return self;
+	};
+
+/***/ },
+/* 19 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
 	exports.BeginningHouse = exports.BeginningIsland = undefined;
 	
 	var _play = __webpack_require__(13);
@@ -2905,6 +3118,7 @@
 	
 	  var self = {
 	    body: body,
+	    isHologram: false,
 	    draw: function draw(shapes) {
 	      var z = 0.6;
 	      shapes.drawColoredRect(_play.colors.dock, 5, -.3, 15, -.7, z);
@@ -2925,19 +3139,35 @@
 	};
 	
 	var BeginningHouse = exports.BeginningHouse = function BeginningHouse(island, world) {
-	  return {
-	    body: island.body,
+	  var bodyDef = new box2d.b2BodyDef();
+	  bodyDef.position.Set(-2, -1.25);
+	  var body = world.CreateBody(bodyDef);
+	  var fixtureDef = new box2d.b2FixtureDef();
+	  var shape = new box2d.b2PolygonShape();
+	  fixtureDef.shape = shape;
+	  shape.Set([new box2d.b2Vec2(-2, -3.75), new box2d.b2Vec2(-2, 0), new box2d.b2Vec2(2, 0), new box2d.b2Vec2(2, -3.75)], 4);
+	  body.CreateFixture(fixtureDef);
+	  shape.Set([new box2d.b2Vec2(-2.5, -3.75), new box2d.b2Vec2(2.5, -3.75), new box2d.b2Vec2(0, -5.75)], 3);
+	  body.CreateFixture(fixtureDef);
+	
+	  var self = {
+	    body: body,
 	    isHologram: true,
 	    draw: function draw(shapes) {
 	      var z = 0.4;
-	      shapes.drawColoredRect(_play.colors.houseBody, -4, -5, 0, -1.25, z);
-	      shapes.drawColoredTriangle(_play.colors.houseRoof, -4.5, -5, 0.5, -5, -2, -7, z);
+	      shapes.drawColoredRect(_play.colors.houseBody, -2, -3.75, 2, 0, z);
+	      shapes.drawColoredTriangle(_play.colors.houseRoof, -2.5, -3.75, 2.5, -3.75, 0, -5.75, z);
+	    },
+	    shouldCollide: function shouldCollide(a, b, c) {
+	      return false;
 	    }
 	  };
+	  body.SetUserData(self);
+	  return self;
 	};
 
 /***/ },
-/* 18 */
+/* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";

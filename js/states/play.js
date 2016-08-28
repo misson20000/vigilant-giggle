@@ -6,6 +6,7 @@ import {Boat} from "../objects/boat.js";
 import {Player} from "../objects/player.js";
 import {Tablet} from "../objects/tablet.js";
 import {BeginningIsland, BeginningHouse} from "../objects/begisland.js";
+import {Mainland} from "../objects/mainland.js";
 import * as box2d from "box2d-html5";
 
 export let colors = {
@@ -132,6 +133,7 @@ export let PlayState = (game, transition) => {
   };
   
   let island = BeginningIsland(world);
+  let mainland = Mainland(world);
   let player = Player(world, buoyancy);
   let tablet = Tablet(manager, buoyancy, player, tabletMaterial);
   objects.push(island);
@@ -139,6 +141,7 @@ export let PlayState = (game, transition) => {
   objects.push(player);
   objects.push(Boat(world, buoyancy, player.body, true));
   objects.push(tablet);
+  objects.push(mainland);
   
   world.AddController(buoyancy);
   world.SetContactFilter({
@@ -181,8 +184,8 @@ export let PlayState = (game, transition) => {
       let b = contact.GetFixtureB();
       let aData = a.GetBody().GetUserData();
       let bData = b.GetBody().GetUserData();
-      if(aData && aData.BeginContact) {
-        aData.BeginContact(a, b);
+      if(aData && aData.EndContact) {
+        aData.EndContact(a, b);
       }
       if(bData && bData.EndContact) {
         bData.EndContact(b, a);
@@ -210,6 +213,11 @@ export let PlayState = (game, transition) => {
     }
     return true;
   };
+
+  let textColor = Color(0., 0., 0., 0);
+  let textState = 0;
+  let textTimer = 6000;
+  let lastHadTablet = false;
   
   let self = {
     initialize() {
@@ -274,10 +282,10 @@ export let PlayState = (game, transition) => {
       opMatrix.load.scale(40, 40, 1); // 1 game unit = 40 pixels
       matrix.multiply(opMatrix);
             
-      matStack.push(matrix);
+      matStack.push(matrix); // cancel out camera movement
       opMatrix.load.translate(camera.x/40.0, camera.y/40.0, 0);
       matrix.multiply(opMatrix);
-
+      
       matStack.push(matrix);
       opMatrix.load.rotate(self.dayCycle()*Math.PI*2);
       matrix.multiply(opMatrix);
@@ -355,6 +363,19 @@ export let PlayState = (game, transition) => {
         shapes.useMaterial(shapesMaterial);
         matStack.pop(matrix);
       }
+
+      opMatrix.load.scale(1.0/40, 1.0/40, 1);
+      matrix.multiply(opMatrix);
+      opMatrix.load.translate(camera.x, camera.y, 0);
+      matrix.multiply(opMatrix);
+      font.useMatrix(matrix);
+      font.drawCentered(textColor, -200, -300, "Attached is a note:");
+      font.drawCentered(textColor, -200, -270, "Encoded within this tablet is a complete snapshot");
+      font.drawCentered(textColor, -200, -240, "of the world before its impending doom. We hope that");
+      font.drawCentered(textColor, -200, -210, "someone will manage to find this and lay the foundation");
+      font.drawCentered(textColor, -200, -180, "for a brand new world.");
+      font.flush();
+      
       matStack.pop(matrix);
     },
     drawBody(body, cb) {
@@ -411,6 +432,29 @@ export let PlayState = (game, transition) => {
         player.body.SetAngularVelocity(-2);
       }
 
+      if(textState == 1) {
+        textColor.a+= delta / 1000.0
+        if(textColor.a >= 1) {
+          textState = 2;
+          textColor.a = 1;
+        }
+      }
+      if(textState == 2) {
+        textTimer-= delta;
+        if(textTimer <= 0) {
+          textState = 3;
+        }
+      }
+      if(textState == 3) {
+        if(textColor.a > 0) {
+          textColor.a-= delta / 1000.0
+        }
+        if(textColor.a <= 0) {
+          textState = 0;
+          textColor.a = 0;
+        }
+      }
+      
       for(let i = 0; i < objects.length; i++) {
         if(objects[i].tick) {
           objects[i].tick();
@@ -451,6 +495,10 @@ export let PlayState = (game, transition) => {
       matrix.multiply(opMatrix);
 
       if(tablet.isCollected()) {
+        if(!lastHadTablet) {
+          lastHadTablet = true;
+          textState = 1;
+        }
         let tabletHover = game.mouse.x > 35-0.9*30 && game.mouse.y > 30-0.7*30 && game.mouse.x < 35+0.9*30 && game.mouse.y < 30+0.7*30;
         
         opMatrix.load.scale(tabletHover ? 75 : 60, tabletHover ? 75 : 60, 1);

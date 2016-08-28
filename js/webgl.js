@@ -394,7 +394,7 @@ export let WebGLRenderer = (game, canvas, gl) => {
                     attrib.runtime.components[0] = arg.r;
                     attrib.runtime.components[1] = arg.g;
                     attrib.runtime.components[2] = arg.b;
-                    attrib.runtime.components[3] = 1;
+                    attrib.runtime.components[3] = arg.a;
                     break;
                   case "vec":
                     for(let j = 0; j < attrib.components; j++) {
